@@ -57,15 +57,18 @@ for (const st of states) {
     const pause = 20000 + Math.floor(Math.random() * 20000);
     await new Promise((r) => setTimeout(r, pause));
   }
+  // enrich + draft what we just scanned so the state goes live on the dashboard immediately
+  try {
+    execSync("npm run enrich", { stdio: "inherit" });
+    execSync("npm run draft", { stdio: "inherit" });
+    console.log(`=== ${st} complete and live on the dashboard ===\n`);
+  } catch {
+    console.warn(`=== ${st}: enrich/draft hiccup, will catch up on the next state ===\n`);
+  }
 }
 
 await browser.close();
 const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
 console.log(`\nBatch done: ${grandTotal} new leads saved. Database total: ${total}.`);
 await pool.end();
-
-console.log("\nRunning enrich...");
-execSync("npm run enrich", { stdio: "inherit" });
-console.log("\nRunning draft...");
-execSync("npm run draft", { stdio: "inherit" });
-console.log("\nAll done — leads are live on the dashboard.");
+console.log("All done — every state is live on the dashboard.");

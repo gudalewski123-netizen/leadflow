@@ -41,7 +41,7 @@ Website situation: ${l.category === "no_site" ? "they have NO website" : `their 
 
 Reply with ONLY the message text.`;
   try {
-    const out = execFileSync("claude", ["-p", prompt], {
+    const out = execFileSync("claude", ["-p", "--model", "haiku", prompt], {
       encoding: "utf8",
       timeout: 60000,
       stdio: ["pipe", "pipe", "pipe"],

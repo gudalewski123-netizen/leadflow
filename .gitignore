@@ -3,3 +3,4 @@ node_modules/
 leadflow.db*
 .neon_uri
 .DS_Store
+logs/

@@ -36,6 +36,11 @@ export async function init() {
       UNIQUE(name, area)
     );
   `);
+  await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS state TEXT");
+  // backfill state from trailing 2-letter code in area, e.g. "Miami FL" -> FL
+  await pool.query(
+    "UPDATE leads SET state = upper(substring(area from '([A-Za-z]{2})\\s*$')) WHERE state IS NULL AND area ~ '[A-Za-z]{2}\\s*$'"
+  );
 }
 
 export interface Lead {
@@ -43,6 +48,7 @@ export interface Lead {
   name: string;
   niche: string | null;
   area: string | null;
+  state: string | null;
   address: string | null;
   phone: string | null;
   website: string | null;
@@ -61,15 +67,15 @@ export interface Lead {
 
 export async function upsertLead(l: Partial<Lead> & { name: string; area: string }) {
   await pool.query(
-    `INSERT INTO leads (name, niche, area, address, phone, website, rating, reviews, maps_url)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `INSERT INTO leads (name, niche, area, state, address, phone, website, rating, reviews, maps_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      ON CONFLICT (name, area) DO UPDATE SET
        phone   = COALESCE(EXCLUDED.phone, leads.phone),
        website = COALESCE(EXCLUDED.website, leads.website),
        rating  = COALESCE(EXCLUDED.rating, leads.rating),
        reviews = COALESCE(EXCLUDED.reviews, leads.reviews),
        maps_url = COALESCE(EXCLUDED.maps_url, leads.maps_url)`,
-    [l.name, l.niche ?? null, l.area, l.address ?? null, l.phone ?? null,
+    [l.name, l.niche ?? null, l.area, l.state ?? null, l.address ?? null, l.phone ?? null,
      l.website ?? null, l.rating ?? null, l.reviews ?? null, l.maps_url ?? null]
   );
 }

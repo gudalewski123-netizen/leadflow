@@ -24,6 +24,10 @@
   h1 { font-size: 17px; margin: 0; letter-spacing: -0.3px; }
   .chip { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
   .chip.active { border-color: var(--accent); color: var(--accent); }
+  select.state {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 10px; font-size: 13px; cursor: pointer;
+  }
   .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
   #counter { font-size: 13px; color: var(--muted); }
   #counter.warn { color: var(--amber); font-weight: 600; }
@@ -59,6 +63,7 @@
 <header>
   <div class="logo"><div class="mark">L</div><h1>LeadFlow</h1></div>
   <div id="filters"></div>
+  <select class="state" id="stateSel" onchange="setState(this.value)"></select>
   <div class="right">
     <span id="counter"></span>
     <button class="logout" onclick="logout()">Log out</button>
@@ -71,7 +76,7 @@ const FILTERS = [
   ["new", "To contact"], ["no_site", "No website"], ["bad_site", "Bad site"],
   ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
-let leads = [], active = "new", stats = {};
+let leads = [], active = "new", stateFilter = "all", stats = {};
 
 const $ = (s) => document.querySelector(s);
 const api = async (url, opts) => {
@@ -99,7 +104,14 @@ function render() {
     [stats.replied ?? 0, "Replied"],
   ].map(([n, l]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
 
+  const states = [...new Set(leads.map((l) => l.state).filter(Boolean))].sort();
+  const sel = $("#stateSel");
+  sel.innerHTML = `<option value="all">All states</option>` +
+    states.map((s) => `<option value="${s}" ${s === stateFilter ? "selected" : ""}>${s}</option>`).join("");
+  sel.style.display = states.length > 1 ? "" : "none";
+
   const shown = leads.filter((l) => {
+    if (stateFilter !== "all" && l.state !== stateFilter) return false;
     if (active === "all") return true;
     if (active === "new") return l.status === "new";
     if (active === "sent" || active === "replied") return l.status === active;
@@ -142,6 +154,7 @@ function card(l) {
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 window.setFilter = (k) => { active = k; render(); };
+window.setState = (s) => { stateFilter = s; render(); };
 
 window.copyOpen = async (id) => {
   const l = leads.find((x) => x.id === id);

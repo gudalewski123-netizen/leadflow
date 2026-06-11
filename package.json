@@ -8,6 +8,7 @@
   },
   "scripts": {
     "scan": "tsx src/scan.ts",
+    "batch": "tsx src/batch.ts",
     "enrich": "tsx src/enrich.ts",
     "draft": "tsx src/draft.ts",
     "dash": "tsx src/dash.ts",

@@ -10,6 +10,10 @@ The machine finds the leads, grades their websites, and drafts the DMs —
 # 1. Find businesses on Google Maps (any niche, any city)
 npm run scan -- "barbershop" "Miami FL" 25
 
+# 1b. Or sweep whole states (top 3 cities each, auto-runs enrich + draft after)
+npm run batch -- "barbershop" FL,GA,TX        # specific states
+npm run batch -- "barbershop" all 15          # all 50 states — hours of scraping!
+
 # 2. Grade their websites + find their Instagram handles
 npm run enrich
 
@@ -17,8 +21,13 @@ npm run enrich
 npm run draft
 
 # 4. Open the outreach dashboard
-npm run dash        # → http://localhost:4571
+npm run dash        # local → http://localhost:4571
 ```
+
+The hosted dashboard (shared, password-protected) lives at
+**https://leadflow-lxig.onrender.com** — all scans land there automatically
+since everything writes to the shared Neon database. Use the state dropdown
+in the header to work outreach one state at a time.
 
 In the dashboard: tap **Copy msg + open IG** → the draft is on your clipboard
 and the business's profile opens → paste, tweak if needed, send → **Mark sent**.

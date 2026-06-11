@@ -12,7 +12,7 @@ import { chromium } from "playwright";
 import { execSync } from "node:child_process";
 import { pool, init } from "./db.js";
 import { scanArea } from "./scrape.js";
-import { STATE_CITIES, ALL_STATES, NICHES } from "./cities.js";
+import { STATE_CITIES, ALL_STATES, NICHES, TRADES } from "./cities.js";
 
 const nicheArg = process.argv[2];
 const statesArg = process.argv[3];
@@ -23,8 +23,13 @@ if (!nicheArg || !statesArg) {
   process.exit(1);
 }
 
-// "allbiz" rotates through every local-business niche; otherwise just the one.
-const niches = nicheArg.toLowerCase() === "allbiz" ? NICHES : [nicheArg];
+// "allbiz" = all 35 niches, "trades" = the 5 skilled trades, a comma list =
+// those exact niches, otherwise a single niche.
+const niches =
+  nicheArg.toLowerCase() === "allbiz" ? NICHES
+  : nicheArg.toLowerCase() === "trades" ? TRADES
+  : nicheArg.includes(",") ? nicheArg.split(",").map((s) => s.trim())
+  : [nicheArg];
 
 const states =
   statesArg.toLowerCase() === "all"

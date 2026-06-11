@@ -59,6 +59,19 @@ export const ALL_STATES = Object.keys(STATE_CITIES);
  * website, and (c) are good web-design / remodel clients. Pass "allbiz" to the
  * batch to rotate through all of these per city.
  */
+/**
+ * Skilled trades — owners are tradesmen, not tech people, so they rarely have a
+ * real website and convert well. Lines up with the trades-template site stack.
+ * Pass "trades" to the batch to scan just these.
+ */
+export const TRADES = [
+  "concrete contractor",
+  "hvac contractor",
+  "roofing contractor",
+  "plumber",
+  "electrician",
+];
+
 export const NICHES = [
   "barbershop",
   "hair salon",

@@ -140,7 +140,8 @@ function card(l) {
     <div class="row" style="margin-top:8px">
       ${l.ig_handle
         ? `<a class="meta" href="https://instagram.com/${esc(l.ig_handle)}" target="_blank" rel="noopener">@${esc(l.ig_handle)}</a>`
-        : `<input class="ig" placeholder="@handle" onchange="saveIg(${l.id}, this.value)" />`}
+        : `<input class="ig" placeholder="@handle" onchange="saveIg(${l.id}, this.value)" />
+           <button class="ghost" style="padding:5px 10px" onclick="findIg(${l.id})">🔎 Find on IG</button>`}
     </div>
     <textarea onchange="saveMsg(${l.id}, this.value)">${esc(l.message ?? "")}</textarea>
     <div class="btns">
@@ -169,6 +170,11 @@ window.setStatus = async (id, status) => {
 };
 window.saveMsg = (id, message) =>
   api(`/api/leads/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ message }) });
+window.findIg = (id) => {
+  const l = leads.find((x) => x.id === id);
+  const q = encodeURIComponent(`${l.name} ${l.area ?? ""} instagram`);
+  window.open(`https://www.google.com/search?q=${q}`, "_blank");
+};
 window.saveIg = async (id, ig_handle) => {
   await api(`/api/leads/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ ig_handle }) });
   await load();

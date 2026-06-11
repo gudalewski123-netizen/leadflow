@@ -8,7 +8,9 @@ import { pool, init, Lead } from "./db.js";
 await init();
 const leads = (
   await pool.query(
-    "SELECT * FROM leads WHERE message IS NULL AND status = 'new' AND ig_handle IS NOT NULL"
+    // draft for every new lead missing a message — a lead without an IG handle
+    // yet still needs its opener ready, so it's send-able the moment you add one.
+    "SELECT * FROM leads WHERE message IS NULL AND status = 'new'"
   )
 ).rows as Lead[];
 

@@ -10,6 +10,10 @@ const UA =
 const IG_JUNK = new Set([
   "p", "reel", "reels", "explore", "accounts", "stories", "direct", "about",
   "developer", "legal", "share", "tv",
+  // booking/aggregator accounts that barbershops link to — NOT their own IG
+  "booksybiz", "booksy", "vagaropro", "vagaro", "squareup", "square",
+  "fresha", "thecut", "getsquire", "squireapp", "schedulicity", "yelp",
+  "facebook", "linktr", "linktree", "google", "goo",
 ]);
 
 function igFromHtml(html: string): string | null {
@@ -66,14 +70,46 @@ function scoreSite(html: string, finalUrl: string): { score: number; notes: stri
   return { score: Math.max(0, score), notes };
 }
 
-async function findIgViaSearch(name: string, area: string): Promise<string | null> {
+// Validate a candidate handle actually resolves to a public IG profile,
+// so we don't save a wrong/dead guess (e.g. a search-result artifact).
+async function igProfileExists(handle: string): Promise<boolean> {
   try {
-    const q = encodeURIComponent(`${name} ${area} instagram`);
-    const { html } = await fetchText(`https://html.duckduckgo.com/html/?q=${q}`);
-    return igFromHtml(html);
+    const { ok, html } = await fetchText(`https://www.instagram.com/${handle}/`, 9000);
+    if (!ok) return false;
+    return /"@type":"ProfilePage"|profilePage_|al:ios:url|content="instagram:\/\//i.test(html)
+      || html.includes(`@${handle}`);
   } catch {
-    return null;
+    return false;
   }
+}
+
+// Try several search engines; the business name + location + "instagram".
+// DuckDuckGo rate-limits fast, so Bing is the workhorse fallback.
+async function findIgViaSearch(name: string, area: string): Promise<string | null> {
+  const q = `${name} ${area} instagram`;
+  const engines = [
+    `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
+    `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+    `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(q)}`,
+  ];
+  const seen = new Set<string>();
+  for (const url of engines) {
+    try {
+      const { html } = await fetchText(url, 12000);
+      // gather a few candidates, not just the first, then verify
+      for (const m of html.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) {
+        const h = m[1].replace(/\.$/, "");
+        if (seen.has(h.toLowerCase())) continue;
+        seen.add(h.toLowerCase());
+        const candidate = igFromHtml(`instagram.com/${h}`);
+        if (candidate && (await igProfileExists(candidate))) return candidate;
+      }
+    } catch {
+      /* try next engine */
+    }
+    await new Promise((r) => setTimeout(r, 600));
+  }
+  return null;
 }
 
 await init();

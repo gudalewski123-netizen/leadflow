@@ -152,9 +152,12 @@ for (const lead of leads) {
     site_notes = "no website at all";
   }
 
-  if (!ig_handle && lead.area) {
+  // The search-engine IG lookup is slow (~4s/lead) and low-yield, so it's gated
+  // behind FIND_IG=1. The fast default just categorizes (instant for no-site
+  // leads); IG handles come from the website HTML above or the Find-on-IG button.
+  if (process.env.FIND_IG === "1" && !ig_handle && lead.area) {
     ig_handle = await findIgViaSearch(lead.name, lead.area);
-    await new Promise((r) => setTimeout(r, 1200)); // be polite to DDG
+    await new Promise((r) => setTimeout(r, 1200));
   }
 
   await pool.query(

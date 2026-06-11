@@ -15,7 +15,7 @@ import { STATE_CITIES, ALL_STATES } from "./cities.js";
 
 const niche = process.argv[2];
 const statesArg = process.argv[3];
-const perCity = Number(process.argv[4] ?? 15);
+const perCity = Number(process.argv[4] ?? 120); // Google caps a search at ~120
 
 if (!niche || !statesArg) {
   console.error('Usage: npm run batch -- "<niche>" <FL,GA,TX | all> [leads-per-city]');

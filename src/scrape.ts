@@ -7,15 +7,30 @@ async function collectPlaceLinks(page: Page, want: number): Promise<string[]> {
   await feed.waitFor({ timeout: 20000 });
   let links: string[] = [];
   let stale = 0;
-  while (links.length < want && stale < 6) {
+  // Scroll until we hit `want`, Google's end-of-list sentinel, or the feed
+  // genuinely stops growing. Google caps a single search at ~120 results.
+  while (links.length < want) {
     const before = links.length;
     links = await page.$$eval('a[href*="/maps/place/"]', (as) =>
       [...new Set(as.map((a) => (a as HTMLAnchorElement).href))]
     );
-    if (links.length === before) stale++;
-    else stale = 0;
-    await feed.evaluate((el) => el.scrollBy(0, 2000));
-    await page.waitForTimeout(900);
+
+    // "You've reached the end of the list." — Google shows this when exhausted.
+    const atEnd = await page
+      .getByText(/reached the end of the list/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (atEnd) break;
+
+    if (links.length === before) {
+      // Give a slow-loading feed a few extra nudges before giving up.
+      if (++stale >= 8) break;
+    } else {
+      stale = 0;
+    }
+    await feed.evaluate((el) => el.scrollBy(0, 3000));
+    await page.waitForTimeout(1100);
   }
   return links.slice(0, want);
 }

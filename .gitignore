@@ -1,0 +1,5 @@
+node_modules/
+.env
+leadflow.db*
+.neon_uri
+.DS_Store

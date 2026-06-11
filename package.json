@@ -1,0 +1,30 @@
+{
+  "name": "leadflow",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "scan": "tsx src/scan.ts",
+    "enrich": "tsx src/enrich.ts",
+    "draft": "tsx src/draft.ts",
+    "dash": "tsx src/dash.ts",
+    "start": "tsx src/dash.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "pg": "^8.15.6",
+    "tsx": "^4.19.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.11.14",
+    "better-sqlite3": "^11.10.0",
+    "playwright": "^1.52.0",
+    "typescript": "^5.8.3"
+  }
+}

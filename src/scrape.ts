@@ -92,19 +92,29 @@ export async function scanArea(
     }
 
     const links = await collectPlaceLinks(page, limit);
+    console.log(`    (${links.length} places found, visiting each)`);
     let saved = 0;
+    let i = 0;
     for (const url of links) {
-      try {
-        const p = await scrapePlace(page, url);
-        if (!p) continue;
-        await upsertLead({ ...p, niche, area, state });
-        saved++;
-        console.log(
-          `    [${saved}/${links.length}] ${p.name}${p.website ? "" : "  ** NO WEBSITE **"}`
-        );
-      } catch (e) {
-        console.warn(`    skipped: ${(e as Error).message.split("\n")[0]}`);
+      i++;
+      // visit each place page, retry once on transient failure
+      let p = null;
+      for (let attempt = 0; attempt < 2 && !p; attempt++) {
+        try {
+          p = await scrapePlace(page, url);
+        } catch (e) {
+          if (attempt === 1)
+            console.warn(`    [${i}/${links.length}] skipped: ${(e as Error).message.split("\n")[0]}`);
+          else await page.waitForTimeout(800);
+        }
       }
+      if (!p) continue;
+      await upsertLead({ ...p, niche, area, state });
+      saved++;
+      console.log(
+        `    [${i}/${links.length}] ${p.name}${p.website ? "" : "  ** NO WEBSITE **"}`
+      );
+      await page.waitForTimeout(250); // gentle pacing so Google doesn't throttle
     }
     return saved;
   } finally {

@@ -40,11 +40,21 @@ console.log(
 console.log(`Rough estimate: ${Math.round((totalCities * 3.5) / 60 * 10) / 10}h of scraping.\n`);
 
 await init();
-const browser = await chromium.launch({ headless: true });
 let grandTotal = 0;
 
 for (const st of states) {
   console.log(`=== ${st} ===`);
+  // Fresh browser per state: isolates crashes (one bad state can't kill the run)
+  // and the browser is fully closed before the enrich/draft step, so the
+  // synchronous CLI work can't starve Playwright's connection.
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (e) {
+    console.warn(`  ${st}: could not launch browser (${(e as Error).message.split("\n")[0]}) — skipping`);
+    continue;
+  }
+
   for (const city of STATE_CITIES[st]) {
     const area = `${city} ${st}`;
     console.log(`  ${area}:`);
@@ -57,17 +67,20 @@ for (const st of states) {
     const pause = 20000 + Math.floor(Math.random() * 20000);
     await new Promise((r) => setTimeout(r, pause));
   }
-  // enrich + draft what we just scanned so the state goes live on the dashboard immediately
+
+  // close the browser BEFORE enrich/draft so the blocking CLI work runs clean
+  await browser.close().catch(() => {});
+
+  // enrich + draft what we just scanned so the state goes live immediately
   try {
     execSync("npm run enrich", { stdio: "inherit" });
     execSync("npm run draft", { stdio: "inherit" });
     console.log(`=== ${st} complete and live on the dashboard ===\n`);
   } catch {
-    console.warn(`=== ${st}: enrich/draft hiccup, will catch up on the next state ===\n`);
+    console.warn(`=== ${st}: enrich/draft hiccup, will catch up later ===\n`);
   }
 }
 
-await browser.close();
 const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
 console.log(`\nBatch done: ${grandTotal} new leads saved. Database total: ${total}.`);
 await pool.end();

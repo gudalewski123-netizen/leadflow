@@ -92,33 +92,48 @@ export async function scanArea(
     }
 
     const links = await collectPlaceLinks(page, limit);
-    console.log(`    (${links.length} places found, visiting each)`);
+    console.log(`    (${links.length} places found)`);
+    await page.close();
+
+    // Visit place pages in parallel with a small worker pool — the place pages
+    // are where website/phone/IG live, and this is the slow part, so 4 concurrent
+    // workers cut wall-clock ~4x without tripping Google's throttling.
+    const WORKERS = 4;
+    const queue = [...links];
     let saved = 0;
-    let i = 0;
-    for (const url of links) {
-      i++;
-      // visit each place page, retry once on transient failure
-      let p = null;
-      for (let attempt = 0; attempt < 2 && !p; attempt++) {
-        try {
-          p = await scrapePlace(page, url);
-        } catch (e) {
-          if (attempt === 1)
-            console.warn(`    [${i}/${links.length}] skipped: ${(e as Error).message.split("\n")[0]}`);
-          else await page.waitForTimeout(800);
+    let done = 0;
+
+    async function worker() {
+      const wp = await browser.newPage({ locale: "en-US", viewport: { width: 1280, height: 800 } });
+      try {
+        while (queue.length) {
+          const url = queue.shift();
+          if (!url) break;
+          let p = null;
+          for (let attempt = 0; attempt < 2 && !p; attempt++) {
+            try {
+              p = await scrapePlace(wp, url);
+            } catch {
+              if (attempt === 0) await wp.waitForTimeout(600);
+            }
+          }
+          done++;
+          if (!p) continue;
+          await upsertLead({ ...p, niche, area, state });
+          saved++;
+          console.log(
+            `    [${done}/${links.length}] ${p.name}${p.website ? "" : "  ** NO WEBSITE **"}`
+          );
         }
+      } finally {
+        await wp.close().catch(() => {});
       }
-      if (!p) continue;
-      await upsertLead({ ...p, niche, area, state });
-      saved++;
-      console.log(
-        `    [${i}/${links.length}] ${p.name}${p.website ? "" : "  ** NO WEBSITE **"}`
-      );
-      await page.waitForTimeout(250); // gentle pacing so Google doesn't throttle
     }
+
+    await Promise.all(Array.from({ length: WORKERS }, () => worker()));
     return saved;
   } finally {
-    await page.close();
+    await page.close().catch(() => {});
   }
 }
 

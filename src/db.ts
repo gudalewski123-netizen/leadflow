@@ -10,6 +10,22 @@ export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 5,
   ssl: { rejectUnauthorized: false },
+  idleTimeoutMillis: 10000, // recycle idle clients before Neon drops them
+  keepAlive: true,
+});
+
+// Neon closes idle server connections; without this handler pg surfaces that as
+// an unhandled error event on an idle client and crashes the whole process.
+// Long-running scans must survive a dropped idle connection — the pool just
+// opens a fresh one on the next query.
+pool.on("error", (err) => {
+  console.warn(`pg pool idle-client error (recovered): ${err.message}`);
+});
+
+// Belt-and-suspenders: never let a stray async DB rejection kill a multi-hour scan.
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.warn(`unhandledRejection (ignored to keep scan alive): ${msg}`);
 });
 
 export async function init() {

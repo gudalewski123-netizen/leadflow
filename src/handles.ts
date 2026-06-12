@@ -35,7 +35,10 @@ const ck = JSON.parse(fs.readFileSync(cookiePath, "utf8")) as {
 
 const testArg = process.argv.indexOf("--test");
 const TEST = testArg !== -1;
-const LIMIT = TEST ? Number(process.argv[testArg + 1] ?? 12) : Infinity;
+const limArg = process.argv.indexOf("--limit");
+const LIMIT = TEST
+  ? Number(process.argv[testArg + 1] ?? 12)
+  : limArg !== -1 ? Number(process.argv[limArg + 1] ?? 150) : Infinity;
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 // Generic words shared by many businesses — matching on these alone pairs you

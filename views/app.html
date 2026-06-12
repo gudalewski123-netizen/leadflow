@@ -180,10 +180,12 @@ function card(l) {
         ? `<a class="meta" href="https://instagram.com/${esc(l.ig_handle)}" target="_blank" rel="noopener">@${esc(l.ig_handle)}</a>`
         : `<input class="ig" placeholder="@handle" onchange="saveIg(${l.id}, this.value)" />
            <button class="ghost" style="padding:5px 10px" onclick="findIg(${l.id})">🔎 Find on IG</button>`}
+      ${l.phone ? `<a class="meta" href="tel:${esc(phoneDigits(l.phone))}">📞 ${esc(l.phone)}</a>` : ""}
     </div>
     <textarea onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea>
     <div class="btns">
       <button class="primary" onclick="copyOpen(${l.id}, this)">Copy msg + open IG</button>
+      ${l.phone ? `<button class="ok" onclick="copyText2(${l.id}, this)">Copy msg + text</button>` : ""}
       <button class="ok" onclick="setStatus(${l.id}, 'sent')">Mark sent</button>
       <button class="ghost" onclick="setStatus(${l.id}, 'replied')">Replied</button>
       <button class="danger" onclick="setStatus(${l.id}, 'skip')">Skip</button>
@@ -192,6 +194,7 @@ function card(l) {
 }
 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function phoneDigits(p) { return String(p).replace(/[^\d+]/g, ""); }
 
 // One simple, friendly template so no lead is ever blank. Uses the AI draft if
 // one exists, otherwise fills the business name into a clean default.
@@ -253,6 +256,20 @@ window.copyOpen = async (id, btn) => {
     const original = btn.textContent;
     const done = l.ig_handle ? "✓ Copied — opened their IG" : "✓ Copied — no handle yet, Google opened";
     btn.textContent = ok ? done : "Copy failed — select manually";
+    btn.style.background = ok ? "var(--accent)" : "var(--red)";
+    btn.style.color = ok ? "#07150f" : "#fff";
+    setTimeout(() => { btn.textContent = original; btn.style.background = ""; btn.style.color = ""; }, 2000);
+  }
+};
+
+window.copyText2 = async (id, btn) => {
+  const l = leads.find((x) => x.id === id);
+  const ok = await copyText(msgFor(l));
+  // open the Messages app with the number + the message pre-filled
+  window.open(`sms:${phoneDigits(l.phone)}?&body=${encodeURIComponent(msgFor(l))}`, "_blank");
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = ok ? "✓ Copied — texting them" : "Copy failed — select manually";
     btn.style.background = ok ? "var(--accent)" : "var(--red)";
     btn.style.color = ok ? "#07150f" : "#fff";
     setTimeout(() => { btn.textContent = original; btn.style.background = ""; btn.style.color = ""; }, 2000);

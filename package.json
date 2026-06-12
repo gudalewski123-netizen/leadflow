@@ -12,7 +12,8 @@
     "enrich": "tsx src/enrich.ts",
     "draft": "tsx src/draft.ts",
     "dash": "tsx src/dash.ts",
-    "start": "tsx src/dash.ts"
+    "start": "tsx src/dash.ts",
+    "handles": "tsx src/handles.ts"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

@@ -4,3 +4,4 @@ leadflow.db*
 .neon_uri
 .DS_Store
 logs/
+.ig_cookies.json

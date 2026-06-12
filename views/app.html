@@ -156,7 +156,7 @@ function card(l) {
     </div>
     <textarea onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea>
     <div class="btns">
-      <button class="primary" onclick="copyOpen(${l.id})">Copy msg + open IG</button>
+      <button class="primary" onclick="copyOpen(${l.id}, this)">Copy msg + open IG</button>
       <button class="ok" onclick="setStatus(${l.id}, 'sent')">Mark sent</button>
       <button class="ghost" onclick="setStatus(${l.id}, 'replied')">Replied</button>
       <button class="danger" onclick="setStatus(${l.id}, 'skip')">Skip</button>
@@ -180,10 +180,49 @@ window.setFilter = (k) => { active = k; render(); };
 window.setState = (s) => { stateFilter = s; render(); };
 window.setNiche = (n) => { nicheFilter = n; render(); };
 
-window.copyOpen = async (id) => {
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // fallback for browsers/contexts where the clipboard API is blocked
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+window.copyOpen = async (id, btn) => {
   const l = leads.find((x) => x.id === id);
-  await navigator.clipboard.writeText(msgFor(l));
-  if (l.ig_handle) window.open(`https://instagram.com/${l.ig_handle}`, "_blank");
+  const ok = await copyText(msgFor(l));
+
+  // always open SOMETHING: their profile if we have the handle, otherwise an
+  // Instagram search for the business so you can find + DM them.
+  const dest = l.ig_handle
+    ? `https://instagram.com/${l.ig_handle}`
+    : `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(l.name)}`;
+  window.open(dest, "_blank");
+
+  // visual confirmation on the button
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = ok ? "✓ Copied — paste in IG" : "Copy failed — select manually";
+    btn.style.background = ok ? "var(--green)" : "var(--red)";
+    btn.style.color = ok ? "#08130c" : "#fff";
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.background = "";
+      btn.style.color = "";
+    }, 1800);
+  }
 };
 
 window.setStatus = async (id, status) => {

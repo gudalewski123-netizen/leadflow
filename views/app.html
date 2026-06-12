@@ -240,17 +240,17 @@ window.copyOpen = async (id, btn) => {
   const l = leads.find((x) => x.id === id);
   const ok = await copyText(msgFor(l));
 
-  // Have a handle → straight to their profile. No handle → a Google search for
-  // the business (reliably surfaces their Instagram as the top result; the page
-  // loads cleanly, unlike Instagram's own search which hits a login wall).
+  // Always open Instagram: their profile if we have the handle, otherwise
+  // Instagram's search for the business name (you're logged in, so it lands on
+  // IG with the business right there — one tap to their page).
   const dest = l.ig_handle
     ? `https://www.instagram.com/${l.ig_handle}/`
-    : `https://www.google.com/search?q=${encodeURIComponent(`"${l.name}" ${l.area ?? ""} instagram`)}`;
+    : `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(l.name)}`;
   window.open(dest, "_blank");
 
   if (btn) {
     const original = btn.textContent;
-    const done = l.ig_handle ? "✓ Copied — opened their IG" : "✓ Copied — find them on Google";
+    const done = l.ig_handle ? "✓ Copied — opened their IG" : "✓ Copied — opened IG search";
     btn.textContent = ok ? done : "Copy failed — select manually";
     btn.style.background = ok ? "var(--accent)" : "var(--red)";
     btn.style.color = ok ? "#07150f" : "#fff";

@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
+import { findIgHandle } from "./findig.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const APP_PASSWORD = process.env.APP_PASSWORD;
@@ -123,6 +124,20 @@ app.post("/api/leads/:id", async (req, res) => {
       [status, id]
     );
   res.json({ ok: true });
+});
+
+// On-demand IG handle resolution — clicked when a no-handle lead's "open IG"
+// button needs to land on the real profile. Searches, verifies, saves, returns it.
+app.post("/api/leads/:id/resolve-ig", async (req, res) => {
+  const id = Number(req.params.id);
+  const r = await pool.query("SELECT id, name, area, ig_handle FROM leads WHERE id=$1", [id]);
+  const lead = r.rows[0];
+  if (!lead) return res.status(404).json({ error: "not found" });
+  if (lead.ig_handle) return res.json({ ig_handle: lead.ig_handle, cached: true });
+
+  const handle = await findIgHandle(lead.name, lead.area);
+  if (handle) await pool.query("UPDATE leads SET ig_handle=$1 WHERE id=$2", [handle, id]);
+  res.json({ ig_handle: handle });
 });
 
 app.get("/healthz", (_req, res) => res.json({ ok: true }));

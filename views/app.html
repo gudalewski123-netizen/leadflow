@@ -239,20 +239,22 @@ function igDestination(l) {
 window.copyOpen = async (id, btn) => {
   const l = leads.find((x) => x.id === id);
   const ok = await copyText(msgFor(l));
-  window.open(igDestination(l), "_blank");
 
-  // visual confirmation on the button
+  // Have a handle → straight to their profile. No handle → a Google search for
+  // the business (reliably surfaces their Instagram as the top result; the page
+  // loads cleanly, unlike Instagram's own search which hits a login wall).
+  const dest = l.ig_handle
+    ? `https://www.instagram.com/${l.ig_handle}/`
+    : `https://www.google.com/search?q=${encodeURIComponent(`"${l.name}" ${l.area ?? ""} instagram`)}`;
+  window.open(dest, "_blank");
+
   if (btn) {
     const original = btn.textContent;
-    const label = l.ig_handle ? "✓ Copied — paste in IG" : "✓ Copied — find them on Google";
-    btn.textContent = ok ? label : "Copy failed — select manually";
+    const done = l.ig_handle ? "✓ Copied — opened their IG" : "✓ Copied — find them on Google";
+    btn.textContent = ok ? done : "Copy failed — select manually";
     btn.style.background = ok ? "var(--accent)" : "var(--red)";
     btn.style.color = ok ? "#07150f" : "#fff";
-    setTimeout(() => {
-      btn.textContent = original;
-      btn.style.background = "";
-      btn.style.color = "";
-    }, 1800);
+    setTimeout(() => { btn.textContent = original; btn.style.background = ""; btn.style.color = ""; }, 2000);
   }
 };
 

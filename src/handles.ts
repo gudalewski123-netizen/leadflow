@@ -99,8 +99,8 @@ async function igSearch(query: string): Promise<IgUser[]> {
 // a confidence bar, not a fuzzy best-of.
 function bestMatch(name: string, area: string | null, users: IgUser[]): string | null {
   const bizTok = tokens(name);
-  const bizJoined = norm(name);
-  if (!bizTok.length) return null;
+  const bizJoined = norm(name);           // whole name, just alphanumerics
+  if (bizJoined.length < 4) return null;  // too short to match confidently
   const leadCity = area ? area.replace(/\s+[A-Z]{2}$/, "").toLowerCase().replace(/[^a-z]/g, "") : "";
 
   for (const u of users) {
@@ -113,26 +113,25 @@ function bestMatch(name: string, area: string | null, users: IgUser[]): string |
       (p) => p !== leadCity && p.length >= 5 && (uNorm.includes(p) || fnJoined.includes(p))
     );
     if (foreignPlace && !(leadCity && (uNorm.includes(leadCity) || fnJoined.includes(leadCity)))) continue;
-    // count distinctive brand words found in the USERNAME — the handle reflecting
-    // the brand is the strong signal; a display name alone matches random people
-    // who happen to share a name (e.g. a different "Daniel Roussos").
-    const uShared = bizTok.filter((t) => uNorm.includes(t));
 
-    // exact: the handle or display name IS the business
+    // STRONGEST — the handle OR the display name is exactly the business name.
+    // This is what rescues generic trade names ("J&J HVAC Services") where every
+    // word is a stop-word: Instagram's display name still matches exactly.
     if (uNorm === bizJoined || fnJoined === bizJoined) return u.username;
-    // multi-word brand: its handle carries 2+ of the distinctive words, or the
-    // whole brand embedded in the handle
-    if (bizTok.length >= 2 && (uShared.length >= 2 || uNorm.includes(bizJoined))) {
+    // the full business name is embedded in the handle or display name (and it's
+    // substantial enough that the overlap isn't coincidental)
+    if (bizJoined.length >= 9 && (uNorm.includes(bizJoined) || fnJoined.includes(bizJoined)))
       return u.username;
-    }
-    // single distinctive word: accept an exact handle, or a handle that starts
-    // with the brand when the brand is a long coined word (≥7 chars, e.g.
-    // "splattzone" → @splattzonetattoo) — but never a short common word as a
-    // substring of a different name ("stash" ✗ @stashhousect).
-    if (bizTok.length === 1) {
-      const b = bizTok[0];
-      if (uNorm === b) return u.username;
-      if (b.length >= 7 && uNorm.startsWith(b)) return u.username;
+
+    // distinctive-brand-word matching (for names that DO have non-generic words)
+    if (bizTok.length) {
+      const uShared = bizTok.filter((t) => uNorm.includes(t));
+      if (bizTok.length >= 2 && uShared.length >= 2) return u.username;
+      if (bizTok.length === 1) {
+        const b = bizTok[0];
+        if (uNorm === b) return u.username;
+        if (b.length >= 7 && uNorm.startsWith(b)) return u.username;
+      }
     }
   }
   return null;
@@ -167,8 +166,9 @@ for (const l of leads) {
   } else {
     console.log(`  ·  ${l.name}  →  (no confident match)`);
   }
-  // throttle: ~1 query / 4-7s to stay gentle on the account
-  await new Promise((r) => setTimeout(r, 4000 + Math.floor(Math.random() * 3000)));
+  // throttle: ~1 query / 11-19s — Instagram starts returning empty results when
+  // queried too fast, so we go slow to keep both accuracy and the account safe.
+  await new Promise((r) => setTimeout(r, 11000 + Math.floor(Math.random() * 8000)));
 }
 console.log(`\n${TEST ? "[TEST] " : ""}Matched ${hits}/${leads.length}.`);
 await pool.end();

@@ -227,23 +227,27 @@ async function copyText(text) {
   }
 }
 
+// Where "open IG" should go. If we have a verified handle, the profile.
+// Otherwise a Google search for the business — Instagram's own keyword-search
+// URL just redirects to a login wall, which is the wrong place to land.
+function igDestination(l) {
+  if (l.ig_handle) return `https://instagram.com/${l.ig_handle}`;
+  const q = encodeURIComponent(`"${l.name}" ${l.area ?? ""} instagram`);
+  return `https://www.google.com/search?q=${q}`;
+}
+
 window.copyOpen = async (id, btn) => {
   const l = leads.find((x) => x.id === id);
   const ok = await copyText(msgFor(l));
-
-  // always open SOMETHING: their profile if we have the handle, otherwise an
-  // Instagram search for the business so you can find + DM them.
-  const dest = l.ig_handle
-    ? `https://instagram.com/${l.ig_handle}`
-    : `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(l.name)}`;
-  window.open(dest, "_blank");
+  window.open(igDestination(l), "_blank");
 
   // visual confirmation on the button
   if (btn) {
     const original = btn.textContent;
-    btn.textContent = ok ? "✓ Copied — paste in IG" : "Copy failed — select manually";
-    btn.style.background = ok ? "var(--green)" : "var(--red)";
-    btn.style.color = ok ? "#08130c" : "#fff";
+    const label = l.ig_handle ? "✓ Copied — paste in IG" : "✓ Copied — find them on Google";
+    btn.textContent = ok ? label : "Copy failed — select manually";
+    btn.style.background = ok ? "var(--accent)" : "var(--red)";
+    btn.style.color = ok ? "#07150f" : "#fff";
     setTimeout(() => {
       btn.textContent = original;
       btn.style.background = "";
@@ -260,7 +264,7 @@ window.saveMsg = (id, message) =>
   api(`/api/leads/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ message }) });
 window.findIg = (id) => {
   const l = leads.find((x) => x.id === id);
-  const q = encodeURIComponent(`${l.name} ${l.area ?? ""} instagram`);
+  const q = encodeURIComponent(`"${l.name}" ${l.area ?? ""} instagram`);
   window.open(`https://www.google.com/search?q=${q}`, "_blank");
 };
 window.saveIg = async (id, ig_handle) => {

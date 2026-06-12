@@ -154,7 +154,7 @@ function card(l) {
         : `<input class="ig" placeholder="@handle" onchange="saveIg(${l.id}, this.value)" />
            <button class="ghost" style="padding:5px 10px" onclick="findIg(${l.id})">🔎 Find on IG</button>`}
     </div>
-    <textarea onchange="saveMsg(${l.id}, this.value)">${esc(l.message ?? "")}</textarea>
+    <textarea onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea>
     <div class="btns">
       <button class="primary" onclick="copyOpen(${l.id})">Copy msg + open IG</button>
       <button class="ok" onclick="setStatus(${l.id}, 'sent')">Mark sent</button>
@@ -166,13 +166,23 @@ function card(l) {
 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
+// One simple, friendly template so no lead is ever blank. Uses the AI draft if
+// one exists, otherwise fills the business name into a clean default.
+function msgFor(l) {
+  if (l.message && l.message.trim()) return l.message;
+  const name = l.name || "your business";
+  if (l.category === "bad_site")
+    return `Hey! I design websites for local businesses and noticed ${name}'s site could use a refresh. I'd love to put together a free mockup so you can see what an updated version could look like — no pressure at all. Let me know if you're interested!`;
+  return `Hey! I design websites for local businesses and noticed ${name} doesn't have one yet. I'd love to put together a free mockup so you can see what it could look like — no pressure at all. Let me know if you're interested!`;
+}
+
 window.setFilter = (k) => { active = k; render(); };
 window.setState = (s) => { stateFilter = s; render(); };
 window.setNiche = (n) => { nicheFilter = n; render(); };
 
 window.copyOpen = async (id) => {
   const l = leads.find((x) => x.id === id);
-  if (l.message) await navigator.clipboard.writeText(l.message);
+  await navigator.clipboard.writeText(msgFor(l));
   if (l.ig_handle) window.open(`https://instagram.com/${l.ig_handle}`, "_blank");
 };
 

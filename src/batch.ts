@@ -52,23 +52,23 @@ console.log(`Niches: ${niches.join(", ")}\n`);
 await init();
 let grandTotal = 0;
 
-for (const st of states) {
-  console.log(`=== ${st} ===`);
-  for (const city of STATE_CITIES[st]) {
-    const area = `${city} ${st}`;
-
-    // Fresh browser PER CITY: isolates crashes (one bad city can't kill the run)
-    // and the browser is fully closed before each enrich/draft step, so the
-    // synchronous CLI work can't starve Playwright's connection.
+// BREADTH-FIRST: niche is the OUTER loop, so we sweep one business type across
+// EVERY state before moving to the next type. That way all 50 states get leads
+// within the first pass (a few hours) instead of one state hogging days of
+// scanning. Each (niche, state) gets a fresh browser, closed before enrich/draft.
+for (const niche of niches) {
+  console.log(`\n########## NICHE: ${niche} ##########`);
+  for (const st of states) {
     let browser;
     try {
       browser = await chromium.launch({ headless: true });
     } catch (e) {
-      console.warn(`  ${area}: could not launch browser (${(e as Error).message.split("\n")[0]}) — skipping`);
+      console.warn(`  ${st}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]}) — skipping`);
       continue;
     }
 
-    for (const niche of niches) {
+    for (const city of STATE_CITIES[st]) {
+      const area = `${city} ${st}`;
       console.log(`  ${area} — ${niche}:`);
       try {
         grandTotal += await scanArea(browser, niche, area, st, perCity);
@@ -82,14 +82,12 @@ for (const st of states) {
 
     // close the browser BEFORE enrich/draft so the blocking CLI work runs clean
     await browser.close().catch(() => {});
-
-    // enrich + draft this city so its leads go live on the dashboard right away
     try {
       execSync("npm run enrich", { stdio: "inherit" });
       execSync("npm run draft", { stdio: "inherit" });
-      console.log(`=== ${area} complete and live on the dashboard ===\n`);
+      console.log(`=== ${st} / ${niche} done and live ===\n`);
     } catch {
-      console.warn(`=== ${area}: enrich/draft hiccup, will catch up later ===\n`);
+      console.warn(`=== ${st} / ${niche}: enrich/draft hiccup, will catch up later ===\n`);
     }
   }
 }

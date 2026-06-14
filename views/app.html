@@ -9,96 +9,105 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d0d0d; --card: #121212; --elevated: #1a1a1a; --border: #1f1f1f;
-    --text: #f8fafc; --muted: #8c8c8c; --accent: #46c79a; --accent-soft: rgba(70,199,154,.13);
-    --red: #f87171; --amber: #e6c34d;
+    --bg: #0b0b0c; --surface: #141416; --surface-2: #1b1b1e; --border: #262629; --border-2: #34343a;
+    --text: #f4f4f5; --muted: #8a8a93; --faint: #5e5e66;
+    --accent: #46c79a; --accent-2: #5fd9ad; --accent-soft: rgba(70,199,154,.12);
+    --red: #f87171; --amber: #e6c34d; --pink: #ff8fce; --sky: #5cb8f0;
   }
   * { box-sizing: border-box; }
+  ::selection { background: var(--accent-soft); }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font-family: 'Inter', -apple-system, system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
+    -webkit-font-smoothing: antialiased; font-size: 14px;
   }
-  header {
-    position: sticky; top: 0; background: rgba(13,13,13,.82); backdrop-filter: blur(12px);
-    padding: 12px 22px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; z-index: 5;
-  }
-  .logo { display: flex; align-items: center; gap: 9px; margin-right: 6px; }
-  .mark {
-    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-    background: linear-gradient(135deg, #5fd9ad, #2fae82); color: #07150f; font-weight: 800; font-size: 15px;
-  }
-  h1 { font-size: 18px; margin: 0; letter-spacing: -0.4px; font-weight: 700; }
-  .chip {
-    border: 1px solid var(--border); background: var(--elevated); color: var(--muted);
-    border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
-    transition: all .12s;
-  }
-  .chip:hover { border-color: #333; color: var(--text); }
-  .chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
-  select.state {
-    background: var(--elevated); color: var(--text); border: 1px solid var(--border);
-    border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 500; cursor: pointer;
-  }
-  select.state:hover { border-color: #333; }
+  /* ---------- header ---------- */
+  header { position: sticky; top: 0; z-index: 10; background: rgba(11,11,12,.9); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+  .topbar, .toolbar { max-width: 1000px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .toolbar { gap: 10px; border-top: 1px solid var(--border); }
+  .logo { display: flex; align-items: center; gap: 10px; margin-right: 4px; }
+  .mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent-2), #2fae82); color: #06140e; font-weight: 800; font-size: 15px; box-shadow: 0 2px 10px rgba(70,199,154,.25); }
+  h1 { font-size: 17px; margin: 0; letter-spacing: -0.4px; font-weight: 700; }
+  /* compact inline stats in the brand bar */
+  #statbar { display: flex; gap: 7px; flex-wrap: wrap; margin-left: 6px; }
+  .stat { display: flex; align-items: baseline; gap: 5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px; }
+  .stat .n { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; }
+  .stat.hot .n { color: var(--accent); }
+  .stat .l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
   .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  #counter { font-size: 13px; color: var(--muted); font-weight: 500; }
+  #counter { font-size: 12.5px; color: var(--muted); font-weight: 500; white-space: nowrap; }
   #counter.warn { color: var(--amber); font-weight: 600; }
-  .logout { background: var(--elevated); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; cursor: pointer; }
-  .logout:hover { border-color: #333; color: var(--text); }
-  #statbar { max-width: 960px; margin: 22px auto 0; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-  .stat .n { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
-  .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-top: 3px; font-weight: 600; }
-  main { max-width: 960px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; transition: border-color .15s; }
-  .card:hover { border-color: #2c2c2c; }
-  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .name { font-weight: 700; font-size: 15.5px; letter-spacing: -0.2px; }
-  .badge { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
-  .badge.no_site { background: rgba(255,123,196,.13); color: #ff8fce; }
-  .badge.bad_site { background: rgba(230,195,77,.12); color: #e6c34d; }
-  .badge.ok_site { background: rgba(56,189,248,.12); color: #38bdf8; }
+  .logout { background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 7px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all .12s; }
+  .logout:hover { border-color: var(--border-2); color: var(--text); }
+  /* segmented status filter */
+  .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 2px; }
+  .chip { border: 0; background: transparent; color: var(--muted); border-radius: 7px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all .12s; }
+  .chip:hover { color: var(--text); }
+  .chip.active { background: var(--accent); color: #06140e; }
+  .selects { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  select.state { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all .12s; }
+  select.state:hover { border-color: var(--border-2); }
+  /* ---------- list ---------- */
+  main { max-width: 1000px; margin: 18px auto 60px; padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; transition: border-color .15s, transform .15s; }
+  .card:hover { border-color: var(--border-2); }
+  .chead { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .name { font-weight: 700; font-size: 15px; letter-spacing: -0.2px; }
+  .rating { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .badge { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+  .badge.no_site { background: rgba(255,143,206,.13); color: var(--pink); }
+  .badge.bad_site { background: rgba(230,195,77,.12); color: var(--amber); }
+  .badge.ok_site { background: rgba(92,184,240,.12); color: var(--sky); }
   .badge.sent { background: var(--accent-soft); color: var(--accent); }
-  .badge.replied { background: rgba(56,189,248,.12); color: #38bdf8; }
-  .meta { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .badge.replied { background: rgba(92,184,240,.12); color: var(--sky); }
+  .meta { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
   .meta a { color: var(--accent); text-decoration: none; font-weight: 500; }
   .meta a:hover { text-decoration: underline; }
-  textarea {
-    width: 100%; margin-top: 12px; background: #0a0a0a; color: var(--text);
-    border: 1px solid var(--border); border-radius: 10px; padding: 11px;
-    font: 13.5px/1.5 'Inter', system-ui, sans-serif; resize: vertical; min-height: 70px;
-  }
+  /* contact chips row */
+  .contact { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; color: var(--text); text-decoration: none; }
+  .pill.ig { color: var(--accent); }
+  .pill:hover { border-color: var(--border-2); }
+  textarea { width: 100%; margin-top: 11px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; font: 13.5px/1.5 'Inter', system-ui, sans-serif; resize: vertical; min-height: 66px; }
   textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-  button { border: 0; border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .12s; }
-  .primary { background: var(--accent); color: #07150f; }
-  .primary:hover { background: #54d4a8; }
-  .ghost { background: var(--elevated); border: 1px solid var(--border); color: var(--muted); }
-  .ghost:hover { border-color: #333; color: var(--text); }
-  .ok { background: var(--accent-soft); border: 1px solid rgba(70,199,154,.3); color: var(--accent); }
-  .ok:hover { background: rgba(70,199,154,.2); }
-  .danger { background: var(--elevated); border: 1px solid var(--border); color: var(--red); }
-  .danger:hover { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.3); }
-  input.ig { background: #0a0a0a; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: inherit; width: 170px; }
+  input.ig { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 7px; padding: 6px 10px; font-size: 12.5px; font-family: inherit; width: 150px; }
   input.ig:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .empty { text-align: center; color: var(--muted); padding: 70px 0; font-size: 14px; }
+  /* buttons */
+  .btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  button { border: 0; border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap; }
+  .primary { background: var(--accent); color: #06140e; }
+  .primary:hover { background: var(--accent-2); }
+  .ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 12px; }
+  .ghost:hover { border-color: var(--border-2); color: var(--text); }
+  .ok { background: transparent; border: 1px solid rgba(70,199,154,.35); color: var(--accent); }
+  .ok:hover { background: var(--accent-soft); }
+  .danger { background: transparent; border: 1px solid var(--border); color: var(--faint); padding: 8px 12px; }
+  .danger:hover { color: var(--red); border-color: rgba(248,113,113,.35); }
+  .spacer { flex: 1; }
+  .more { align-self: center; margin: 6px auto 0; }
+  .empty { text-align: center; color: var(--muted); padding: 80px 0; font-size: 14px; }
+  @media (max-width: 640px) { .topbar { flex-wrap: wrap; height: auto; padding: 10px 16px; } #statbar { width: 100%; order: 3; } .toolbar { padding: 8px 16px; } }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><div class="mark">L</div><h1>LeadFlow</h1></div>
-  <div id="filters"></div>
-  <select class="state" id="stateSel" onchange="setState(this.value)"></select>
-  <select class="state" id="nicheSel" onchange="setNiche(this.value)"></select>
-  <select class="state" id="chanSel" onchange="setChan(this.value)"></select>
-  <div class="right">
-    <span id="counter"></span>
-    <button class="logout" onclick="logout()">Log out</button>
+  <div class="topbar">
+    <div class="logo"><div class="mark">L</div><h1>LeadFlow</h1></div>
+    <div id="statbar"></div>
+    <div class="right">
+      <span id="counter"></span>
+      <button class="logout" onclick="logout()">Log out</button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div id="filters" class="seg"></div>
+    <div class="selects">
+      <select class="state" id="stateSel" onchange="setState(this.value)"></select>
+      <select class="state" id="nicheSel" onchange="setNiche(this.value)"></select>
+      <select class="state" id="chanSel" onchange="setChan(this.value)"></select>
+    </div>
   </div>
 </header>
-<div id="statbar"></div>
 <main id="list"><div class="empty">Loading…</div></main>
 <script>
 const FILTERS = [
@@ -128,12 +137,11 @@ function render() {
   if ((stats.sent_today ?? 0) >= 30) counter.textContent += " — slow down";
 
   $("#statbar").innerHTML = [
-    [stats.total ?? 0, "Total leads"],
-    [stats.to_contact ?? 0, "To contact"],
-    [stats.no_site ?? 0, "No website"],
-    [stats.sent_today ?? 0, "Sent today"],
-    [stats.replied ?? 0, "Replied"],
-  ].map(([n, l]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+    [stats.total ?? 0, "Total", false],
+    [stats.no_site ?? 0, "No website", true],
+    [stats.sent_today ?? 0, "Sent today", false],
+    [stats.replied ?? 0, "Replied", false],
+  ].map(([n, l, hot]) => `<div class="stat${hot ? " hot" : ""}"><span class="n">${(+n).toLocaleString()}</span><span class="l">${l}</span></div>`).join("");
 
   // populate the state dropdown with per-state to-contact counts
   const counts = {};
@@ -178,8 +186,7 @@ function render() {
   const slice = shown.slice(0, renderLimit);
   let html = slice.map(card).join("");
   if (shown.length > renderLimit) {
-    html += `<button class="primary" style="margin:8px auto;padding:12px 20px" onclick="showMore()">
-      Show more — ${shown.length - renderLimit} of ${shown.length} hidden</button>`;
+    html += `<button class="ghost more" onclick="showMore()">Show more — ${(shown.length - renderLimit).toLocaleString()} of ${shown.length.toLocaleString()} remaining</button>`;
   }
   $("#list").innerHTML = html;
 }
@@ -190,30 +197,29 @@ function card(l) {
   const cat = l.category ? badge(l.category, ({no_site:"NO SITE",bad_site:`WEAK SITE ${l.site_score}`,ok_site:`OK SITE ${l.site_score}`})[l.category]) : "";
   const st = l.status !== "new" ? badge(l.status, l.status.toUpperCase()) : "";
   return `<div class="card" id="lead-${l.id}">
-    <div class="row">
+    <div class="chead">
       <span class="name">${esc(l.name)}</span> ${cat} ${st}
-      ${l.rating ? `<span class="meta">★ ${l.rating}${l.reviews ? ` (${l.reviews})` : ""}</span>` : ""}
+      ${l.rating ? `<span class="rating">★ ${l.rating}${l.reviews ? ` (${l.reviews})` : ""}</span>` : ""}
     </div>
     <div class="meta">
       ${esc(l.niche ?? "")} · ${esc(l.area ?? "")}
-      ${l.website ? ` · <a href="${esc(l.website)}" target="_blank" rel="noopener">site</a>` : ""}
+      ${l.website ? ` · <a href="${esc(l.website)}" target="_blank" rel="noopener">website</a>` : ""}
       ${l.maps_url ? ` · <a href="${esc(l.maps_url)}" target="_blank" rel="noopener">maps</a>` : ""}
-      ${l.site_notes ? ` · ${esc(l.site_notes)}` : ""}
+      ${l.site_notes && l.category !== "no_site" ? ` · ${esc(l.site_notes)}` : ""}
     </div>
-    <div class="row" style="margin-top:8px">
+    <div class="contact">
       ${l.ig_handle
-        ? `<a class="meta" href="https://instagram.com/${esc(l.ig_handle)}" target="_blank" rel="noopener">@${esc(l.ig_handle)}</a>`
+        ? `<a class="pill ig" href="https://instagram.com/${esc(l.ig_handle)}" target="_blank" rel="noopener">📷 @${esc(l.ig_handle)}</a>`
         : `<input class="ig" placeholder="@handle" onchange="saveIg(${l.id}, this.value)" />
-           <button class="ghost" style="padding:5px 10px" onclick="findIg(${l.id})">🔎 Find on IG</button>`}
-      ${l.phone ? `<a class="meta" href="tel:${esc(phoneDigits(l.phone))}">📞 ${esc(l.phone)}</a>` : ""}
+           <button class="ghost" onclick="findIg(${l.id})">🔎 Find on IG</button>`}
+      ${l.phone ? `<a class="pill" href="tel:${esc(phoneDigits(l.phone))}">📞 ${esc(l.phone)}</a>` : ""}
     </div>
     <textarea onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea>
     <div class="btns">
-      ${l.ig_handle
-        ? `<button class="primary" onclick="copyOpen(${l.id}, this)">Copy msg + open IG</button>`
-        : ""}
-      ${l.phone ? `<button class="primary" onclick="copyText2(${l.id}, this)">Copy msg + text 📱</button>` : ""}
-      <button class="ok" onclick="setStatus(${l.id}, 'sent')">Mark sent</button>
+      ${l.ig_handle ? `<button class="primary" onclick="copyOpen(${l.id}, this)">Copy + open IG</button>` : ""}
+      ${l.phone ? `<button class="primary" onclick="copyText2(${l.id}, this)">Copy + text</button>` : ""}
+      <button class="ok" onclick="setStatus(${l.id}, 'sent')">✓ Mark sent</button>
+      <span class="spacer"></span>
       <button class="ghost" onclick="setStatus(${l.id}, 'replied')">Replied</button>
       <button class="danger" onclick="setStatus(${l.id}, 'skip')">Skip</button>
     </div>

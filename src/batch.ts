@@ -52,51 +52,59 @@ console.log(`Niches: ${niches.join(", ")}\n`);
 await init();
 let grandTotal = 0;
 
-// CONTINUOUS: the whole sweep loops forever so it never stops finding businesses.
-// Each pass re-scans every niche × state — Google Maps listings change and new
-// businesses open, so later passes keep turning up fresh leads (dedup on
-// name+area means nothing is double-counted). Stop it by killing the process.
-//
-// BREADTH-FIRST within each pass: niche is the OUTER loop, so one business type
-// sweeps EVERY state before the next type — all 50 states get leads in the first
-// few hours. Each (niche, state) gets a fresh browser, closed before enrich/draft.
+// run an async fn over items with at most `limit` running concurrently
+async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
+  const queue = [...items];
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        if (item === undefined) break;
+        try { await fn(item); } catch (e) { console.warn(`pool item failed: ${(e as Error).message.split("\n")[0]}`); }
+      }
+    })
+  );
+}
+
+// Scan one state's cities for one niche (its own browser, isolated from others).
+async function scanState(st: string, niche: string) {
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (e) {
+    console.warn(`  ${st}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]})`);
+    return;
+  }
+  try {
+    for (const city of STATE_CITIES[st]) {
+      const area = `${city} ${st}`;
+      console.log(`  ${area} — ${niche}:`);
+      try {
+        grandTotal += await scanArea(browser, niche, area, st, perCity);
+      } catch (e) {
+        console.warn(`  ${area}/${niche} failed: ${(e as Error).message.split("\n")[0]} — moving on`);
+      }
+      const pause = 8000 + Math.floor(Math.random() * 8000);
+      await new Promise((r) => setTimeout(r, pause));
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+// PARALLEL + CONTINUOUS: scan several states AT ONCE so all 50 fill in fast
+// instead of waiting alphabetically. enrich/draft is handled continuously by the
+// background watcher (tools/watch-enrich.sh), so the scan just keeps scanning.
+// The whole thing loops forever — each pass re-sweeps and catches new businesses
+// (dedup on name+area means nothing is double-counted). Kill the process to stop.
+const STATE_CONCURRENCY = 4;
 for (let pass = 1; ; pass++) {
-  console.log(`\n==================== PASS ${pass} ====================`);
+  console.log(`\n==================== PASS ${pass} (${STATE_CONCURRENCY} states at once) ====================`);
   for (const niche of niches) {
     console.log(`\n########## NICHE: ${niche} (pass ${pass}) ##########`);
-    for (const st of states) {
-      let browser;
-      try {
-        browser = await chromium.launch({ headless: true });
-      } catch (e) {
-        console.warn(`  ${st}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]}) — skipping`);
-        continue;
-      }
-
-      for (const city of STATE_CITIES[st]) {
-        const area = `${city} ${st}`;
-        console.log(`  ${area} — ${niche}:`);
-        try {
-          grandTotal += await scanArea(browser, niche, area, st, perCity);
-        } catch (e) {
-          console.warn(`  ${area}/${niche} failed: ${(e as Error).message.split("\n")[0]} — moving on`);
-        }
-        // pause between searches so Google doesn't captcha-block the IP
-        const pause = 12000 + Math.floor(Math.random() * 14000);
-        await new Promise((r) => setTimeout(r, pause));
-      }
-
-      // close the browser BEFORE enrich/draft so the blocking CLI work runs clean
-      await browser.close().catch(() => {});
-      try {
-        execSync("npm run enrich", { stdio: "inherit" });
-        execSync("npm run draft", { stdio: "inherit" });
-        const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
-        console.log(`=== ${st} / ${niche} done and live — ${total} total leads (pass ${pass}) ===\n`);
-      } catch {
-        console.warn(`=== ${st} / ${niche}: enrich/draft hiccup, will catch up later ===\n`);
-      }
-    }
+    await runPool(states, STATE_CONCURRENCY, (st) => scanState(st, niche));
+    const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
+    console.log(`=== ${niche} swept across all ${states.length} states — ${total} total leads (pass ${pass}) ===`);
   }
   console.log(`\n########## PASS ${pass} COMPLETE — looping for more ##########`);
 }

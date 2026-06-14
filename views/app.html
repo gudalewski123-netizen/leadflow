@@ -184,8 +184,10 @@ function card(l) {
     </div>
     <textarea onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea>
     <div class="btns">
-      <button class="primary" onclick="copyOpen(${l.id}, this)">Copy msg + open IG</button>
-      ${l.phone ? `<button class="ok" onclick="copyText2(${l.id}, this)">Copy msg + text</button>` : ""}
+      ${l.ig_handle
+        ? `<button class="primary" onclick="copyOpen(${l.id}, this)">Copy msg + open IG</button>`
+        : ""}
+      ${l.phone ? `<button class="primary" onclick="copyText2(${l.id}, this)">Copy msg + text 📱</button>` : ""}
       <button class="ok" onclick="setStatus(${l.id}, 'sent')">Mark sent</button>
       <button class="ghost" onclick="setStatus(${l.id}, 'replied')">Replied</button>
       <button class="danger" onclick="setStatus(${l.id}, 'skip')">Skip</button>

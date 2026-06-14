@@ -92,6 +92,7 @@
   <div id="filters"></div>
   <select class="state" id="stateSel" onchange="setState(this.value)"></select>
   <select class="state" id="nicheSel" onchange="setNiche(this.value)"></select>
+  <select class="state" id="chanSel" onchange="setChan(this.value)"></select>
   <div class="right">
     <span id="counter"></span>
     <button class="logout" onclick="logout()">Log out</button>
@@ -104,7 +105,7 @@ const FILTERS = [
   ["new", "To contact"], ["no_site", "No website"], ["bad_site", "Bad site"],
   ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
-let leads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", stats = {};
+let leads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", stats = {};
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
 const $ = (s) => document.querySelector(s);
@@ -148,9 +149,19 @@ function render() {
   nsel.innerHTML = `<option value="all">All types</option>` +
     nicheList.map((n) => `<option value="${n}" ${n === nicheFilter ? "selected" : ""}>${n} (${nicheCounts[n]})</option>`).join("");
 
+  // contact-channel dropdown: work Instagram and phone leads separately
+  const igCount = leads.filter((l) => l.ig_handle && l.status === "new").length;
+  const phoneCount = leads.filter((l) => !l.ig_handle && l.phone && l.status === "new").length;
+  $("#chanSel").innerHTML =
+    `<option value="all" ${chanFilter === "all" ? "selected" : ""}>All channels</option>` +
+    `<option value="ig" ${chanFilter === "ig" ? "selected" : ""}>📷 On Instagram (${igCount})</option>` +
+    `<option value="phone" ${chanFilter === "phone" ? "selected" : ""}>📱 Phone only (${phoneCount})</option>`;
+
   const shown = leads.filter((l) => {
     if (stateFilter !== "all" && l.state !== stateFilter) return false;
     if (nicheFilter !== "all" && l.niche !== nicheFilter) return false;
+    if (chanFilter === "ig" && !l.ig_handle) return false;
+    if (chanFilter === "phone" && l.ig_handle) return false;
     if (active === "all") return true;
     if (active === "new") return l.status === "new";
     if (active === "sent" || active === "replied") return l.status === active;
@@ -211,6 +222,7 @@ function msgFor(l) {
 window.setFilter = (k) => { active = k; render(); };
 window.setState = (s) => { stateFilter = s; render(); };
 window.setNiche = (n) => { nicheFilter = n; render(); };
+window.setChan = (c) => { chanFilter = c; render(); };
 
 async function copyText(text) {
   try {

@@ -52,47 +52,51 @@ console.log(`Niches: ${niches.join(", ")}\n`);
 await init();
 let grandTotal = 0;
 
-// BREADTH-FIRST: niche is the OUTER loop, so we sweep one business type across
-// EVERY state before moving to the next type. That way all 50 states get leads
-// within the first pass (a few hours) instead of one state hogging days of
-// scanning. Each (niche, state) gets a fresh browser, closed before enrich/draft.
-for (const niche of niches) {
-  console.log(`\n########## NICHE: ${niche} ##########`);
-  for (const st of states) {
-    let browser;
-    try {
-      browser = await chromium.launch({ headless: true });
-    } catch (e) {
-      console.warn(`  ${st}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]}) — skipping`);
-      continue;
-    }
-
-    for (const city of STATE_CITIES[st]) {
-      const area = `${city} ${st}`;
-      console.log(`  ${area} — ${niche}:`);
+// CONTINUOUS: the whole sweep loops forever so it never stops finding businesses.
+// Each pass re-scans every niche × state — Google Maps listings change and new
+// businesses open, so later passes keep turning up fresh leads (dedup on
+// name+area means nothing is double-counted). Stop it by killing the process.
+//
+// BREADTH-FIRST within each pass: niche is the OUTER loop, so one business type
+// sweeps EVERY state before the next type — all 50 states get leads in the first
+// few hours. Each (niche, state) gets a fresh browser, closed before enrich/draft.
+for (let pass = 1; ; pass++) {
+  console.log(`\n==================== PASS ${pass} ====================`);
+  for (const niche of niches) {
+    console.log(`\n########## NICHE: ${niche} (pass ${pass}) ##########`);
+    for (const st of states) {
+      let browser;
       try {
-        grandTotal += await scanArea(browser, niche, area, st, perCity);
+        browser = await chromium.launch({ headless: true });
       } catch (e) {
-        console.warn(`  ${area}/${niche} failed: ${(e as Error).message.split("\n")[0]} — moving on`);
+        console.warn(`  ${st}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]}) — skipping`);
+        continue;
       }
-      // pause between searches so Google doesn't captcha-block the IP
-      const pause = 12000 + Math.floor(Math.random() * 14000);
-      await new Promise((r) => setTimeout(r, pause));
-    }
 
-    // close the browser BEFORE enrich/draft so the blocking CLI work runs clean
-    await browser.close().catch(() => {});
-    try {
-      execSync("npm run enrich", { stdio: "inherit" });
-      execSync("npm run draft", { stdio: "inherit" });
-      console.log(`=== ${st} / ${niche} done and live ===\n`);
-    } catch {
-      console.warn(`=== ${st} / ${niche}: enrich/draft hiccup, will catch up later ===\n`);
+      for (const city of STATE_CITIES[st]) {
+        const area = `${city} ${st}`;
+        console.log(`  ${area} — ${niche}:`);
+        try {
+          grandTotal += await scanArea(browser, niche, area, st, perCity);
+        } catch (e) {
+          console.warn(`  ${area}/${niche} failed: ${(e as Error).message.split("\n")[0]} — moving on`);
+        }
+        // pause between searches so Google doesn't captcha-block the IP
+        const pause = 12000 + Math.floor(Math.random() * 14000);
+        await new Promise((r) => setTimeout(r, pause));
+      }
+
+      // close the browser BEFORE enrich/draft so the blocking CLI work runs clean
+      await browser.close().catch(() => {});
+      try {
+        execSync("npm run enrich", { stdio: "inherit" });
+        execSync("npm run draft", { stdio: "inherit" });
+        const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
+        console.log(`=== ${st} / ${niche} done and live — ${total} total leads (pass ${pass}) ===\n`);
+      } catch {
+        console.warn(`=== ${st} / ${niche}: enrich/draft hiccup, will catch up later ===\n`);
+      }
     }
   }
+  console.log(`\n########## PASS ${pass} COMPLETE — looping for more ##########`);
 }
-
-const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
-console.log(`\nBatch done: ${grandTotal} new leads saved. Database total: ${total}.`);
-await pool.end();
-console.log("All done — every state is live on the dashboard.");

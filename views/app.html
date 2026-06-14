@@ -241,16 +241,17 @@ function igDestination(l) {
 
 window.copyOpen = async (id, btn) => {
   const l = leads.find((x) => x.id === id);
-  const ok = await copyText(msgFor(l));
 
-  // Have the handle → open their actual Instagram profile. No handle → a Google
-  // search for the business (surfaces their real account as the top result).
-  // Instagram's own keyword search only shows a content feed, not the business,
-  // so it's not a useful destination.
+  // Open the tab FIRST, synchronously inside the click — if we await the copy
+  // before opening, the browser no longer sees a user gesture and the popup
+  // blocker kills it. Have the handle → their profile; no handle → a Google
+  // search that surfaces their real account (IG's own keyword search is useless).
   const dest = l.ig_handle
     ? `https://www.instagram.com/${l.ig_handle}/`
     : `https://www.google.com/search?q=${encodeURIComponent(`"${l.name}" ${l.area ?? ""} instagram`)}`;
   window.open(dest, "_blank");
+
+  const ok = await copyText(msgFor(l));
 
   if (btn) {
     const original = btn.textContent;
@@ -264,9 +265,10 @@ window.copyOpen = async (id, btn) => {
 
 window.copyText2 = async (id, btn) => {
   const l = leads.find((x) => x.id === id);
-  const ok = await copyText(msgFor(l));
-  // open the Messages app with the number + the message pre-filled
+  // open the Messages app FIRST (before the await) so the popup blocker doesn't
+  // kill it, with the number + the message pre-filled
   window.open(`sms:${phoneDigits(l.phone)}?&body=${encodeURIComponent(msgFor(l))}`, "_blank");
+  const ok = await copyText(msgFor(l));
   if (btn) {
     const original = btn.textContent;
     btn.textContent = ok ? "✓ Copied — texting them" : "Copy failed — select manually";

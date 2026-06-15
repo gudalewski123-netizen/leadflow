@@ -63,7 +63,12 @@ async function scrapePlace(page: Page, url: string) {
     }
   }
 
-  return { name, website, phone, address, rating, reviews, maps_url: url };
+  // Skip dead businesses: Google flags "Permanently closed" / "Temporarily
+  // closed" right on the place page. No point pitching a closed shop.
+  const bodyText = await page.locator('div[role="main"]').first().innerText().catch(() => "");
+  const closed = /\b(permanently closed|temporarily closed)\b/i.test(bodyText);
+
+  return { name, website, phone, address, rating, reviews, maps_url: url, closed };
 }
 
 /** Scan one "<city> <ST>" area. Returns number of leads saved. */
@@ -119,6 +124,10 @@ export async function scanArea(
           }
           done++;
           if (!p) continue;
+          if (p.closed) {
+            console.log(`    [${done}/${links.length}] ${p.name}  -- CLOSED, skipped`);
+            continue;
+          }
           await upsertLead({ ...p, niche, area, state });
           saved++;
           console.log(

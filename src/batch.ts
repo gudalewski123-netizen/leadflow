@@ -12,14 +12,14 @@ import { chromium } from "playwright";
 import { execSync } from "node:child_process";
 import { pool, init } from "./db.js";
 import { scanArea } from "./scrape.js";
-import { STATE_CITIES, ALL_STATES, NICHES, TRADES } from "./cities.js";
+import { NICHES, TRADES, buildRegions, Region } from "./cities.js";
 
 const nicheArg = process.argv[2];
-const statesArg = process.argv[3];
+const regionArg = process.argv[3];
 const perCity = Number(process.argv[4] ?? 120); // Google caps a search at ~120
 
-if (!nicheArg || !statesArg) {
-  console.error('Usage: npm run batch -- <"niche" | allbiz> <FL,GA,TX | all> [leads-per-city]');
+if (!nicheArg || !regionArg) {
+  console.error('Usage: npm run batch -- <"niche" | allbiz> <us | world | intl | uk,poland,FL | ...> [leads/search]');
   process.exit(1);
 }
 
@@ -31,22 +31,18 @@ const niches =
   : nicheArg.includes(",") ? nicheArg.split(",").map((s) => s.trim())
   : [nicheArg];
 
-const states =
-  statesArg.toLowerCase() === "all"
-    ? ALL_STATES
-    : statesArg.toUpperCase().split(",").map((s) => s.trim());
-
-const unknown = states.filter((s) => !STATE_CITIES[s]);
-if (unknown.length) {
-  console.error(`Unknown state code(s): ${unknown.join(", ")}`);
+// Region selector: us / world / intl / a comma list of US states + countries.
+const regions: Region[] = buildRegions(regionArg);
+if (!regions.length) {
+  console.error(`No regions matched "${regionArg}". Try: us, world, intl, uk, poland, "FL,GA", "uk,poland".`);
   process.exit(1);
 }
 
-const totalCities = states.reduce((n, s) => n + STATE_CITIES[s].length, 0);
-const totalScans = totalCities * niches.length;
+const totalCities = regions.reduce((n, r) => n + r.areas.length, 0);
 console.log(
-  `Batch scan: ${niches.length} niche(s) × ${states.length} state(s) × cities = ${totalScans} searches, ~${perCity}/search.`
+  `Batch scan: ${niches.length} niche(s) × ${regions.length} region(s) × cities = ${totalCities * niches.length} searches, ~${perCity}/search.`
 );
+console.log(`Regions: ${regions.map((r) => r.state).join(", ")}`);
 console.log(`Niches: ${niches.join(", ")}\n`);
 
 await init();
@@ -66,21 +62,22 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
   );
 }
 
-// Scan one state's cities for one niche (its own browser, isolated from others).
-async function scanState(st: string, niche: string) {
+// Scan one region's cities for one niche (its own browser, isolated from others).
+// A region is a US state ("AL" → "Birmingham AL") or a country ("Poland" →
+// "Warsaw, Poland"); scanArea stores region.state so the dashboard can filter by it.
+async function scanRegion(region: Region, niche: string) {
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
   } catch (e) {
-    console.warn(`  ${st}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]})`);
+    console.warn(`  ${region.state}/${niche}: browser launch failed (${(e as Error).message.split("\n")[0]})`);
     return;
   }
   try {
-    for (const city of STATE_CITIES[st]) {
-      const area = `${city} ${st}`;
+    for (const area of region.areas) {
       console.log(`  ${area} — ${niche}:`);
       try {
-        grandTotal += await scanArea(browser, niche, area, st, perCity);
+        grandTotal += await scanArea(browser, niche, area, region.state, perCity);
       } catch (e) {
         console.warn(`  ${area}/${niche} failed: ${(e as Error).message.split("\n")[0]} — moving on`);
       }
@@ -92,19 +89,19 @@ async function scanState(st: string, niche: string) {
   }
 }
 
-// PARALLEL + CONTINUOUS: scan several states AT ONCE so all 50 fill in fast
-// instead of waiting alphabetically. enrich/draft is handled continuously by the
+// PARALLEL + CONTINUOUS: scan several regions AT ONCE so they all fill in fast
+// instead of waiting in line. enrich/draft is handled continuously by the
 // background watcher (tools/watch-enrich.sh), so the scan just keeps scanning.
 // The whole thing loops forever — each pass re-sweeps and catches new businesses
 // (dedup on name+area means nothing is double-counted). Kill the process to stop.
-const STATE_CONCURRENCY = 4;
+const REGION_CONCURRENCY = 4;
 for (let pass = 1; ; pass++) {
-  console.log(`\n==================== PASS ${pass} (${STATE_CONCURRENCY} states at once) ====================`);
+  console.log(`\n==================== PASS ${pass} (${REGION_CONCURRENCY} regions at once) ====================`);
   for (const niche of niches) {
     console.log(`\n########## NICHE: ${niche} (pass ${pass}) ##########`);
-    await runPool(states, STATE_CONCURRENCY, (st) => scanState(st, niche));
+    await runPool(regions, REGION_CONCURRENCY, (r) => scanRegion(r, niche));
     const total = (await pool.query("SELECT COUNT(*)::int c FROM leads")).rows[0].c;
-    console.log(`=== ${niche} swept across all ${states.length} states — ${total} total leads (pass ${pass}) ===`);
+    console.log(`=== ${niche} swept across all ${regions.length} regions — ${total} total leads (pass ${pass}) ===`);
   }
   console.log(`\n########## PASS ${pass} COMPLETE — looping for more ##########`);
 }

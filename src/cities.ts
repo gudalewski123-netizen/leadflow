@@ -55,6 +55,76 @@ export const STATE_CITIES: Record<string, string[]> = {
 export const ALL_STATES = Object.keys(STATE_CITIES);
 
 /**
+ * International coverage. Google Maps works worldwide, so we can scan any
+ * country's cities the same way — the query just uses "City, Country" and the
+ * lead's region is stored as the full country name (e.g. "Poland"), so it shows
+ * up distinctly from the 2-letter US state codes in the dashboard filter.
+ */
+export const COUNTRY_CITIES: Record<string, string[]> = {
+  "United Kingdom": ["London", "Manchester", "Birmingham", "Leeds", "Glasgow", "Liverpool", "Bristol", "Edinburgh", "Sheffield", "Cardiff", "Newcastle", "Nottingham"],
+  "Poland": ["Warsaw", "Kraków", "Łódź", "Wrocław", "Poznań", "Gdańsk", "Szczecin", "Lublin", "Katowice", "Bydgoszcz"],
+  "Ireland": ["Dublin", "Cork", "Galway", "Limerick", "Waterford"],
+  "Germany": ["Berlin", "Hamburg", "Munich", "Cologne", "Frankfurt", "Stuttgart", "Düsseldorf", "Leipzig"],
+  "France": ["Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", "Bordeaux", "Lille"],
+  "Spain": ["Madrid", "Barcelona", "Valencia", "Seville", "Málaga", "Bilbao"],
+  "Italy": ["Rome", "Milan", "Naples", "Turin", "Florence", "Bologna"],
+  "Netherlands": ["Amsterdam", "Rotterdam", "The Hague", "Utrecht", "Eindhoven"],
+  "Portugal": ["Lisbon", "Porto", "Braga", "Faro"],
+  "Canada": ["Toronto", "Montreal", "Vancouver", "Calgary", "Ottawa", "Edmonton", "Winnipeg"],
+  "Australia": ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast"],
+};
+
+// Type "uk", "poland", etc. in the batch selector → resolve to the full name.
+export const COUNTRY_ALIASES: Record<string, string> = {
+  uk: "United Kingdom", britain: "United Kingdom", england: "United Kingdom", gb: "United Kingdom",
+  poland: "Poland", pl: "Poland",
+  ireland: "Ireland", ie: "Ireland",
+  germany: "Germany", de: "Germany",
+  france: "France", fr: "France",
+  spain: "Spain", es: "Spain",
+  italy: "Italy", it: "Italy",
+  netherlands: "Netherlands", holland: "Netherlands", nl: "Netherlands",
+  portugal: "Portugal", pt: "Portugal",
+  canada: "Canada", australia: "Australia",
+};
+
+export interface Region { state: string; areas: string[] }
+
+/** US state → its cities tagged with the state code, e.g. "Birmingham AL". */
+function usRegion(st: string): Region {
+  return { state: st, areas: STATE_CITIES[st].map((c) => `${c} ${st}`) };
+}
+/** Country → its cities tagged with the country, e.g. "Warsaw, Poland". */
+function countryRegion(name: string): Region {
+  return { state: name, areas: COUNTRY_CITIES[name].map((c) => `${c}, ${name}`) };
+}
+
+/**
+ * Resolve a location selector into the regions to scan.
+ *   "us" / "all"  → all 50 US states
+ *   "world"       → US + every country
+ *   "intl"        → every country (no US)
+ *   "uk,poland"   → those countries
+ *   "FL,GA,uk"    → mix of US state codes and countries
+ */
+export function buildRegions(selector: string): Region[] {
+  const sel = selector.toLowerCase().trim();
+  if (sel === "us" || sel === "all") return ALL_STATES.map(usRegion);
+  if (sel === "intl" || sel === "international") return Object.keys(COUNTRY_CITIES).map(countryRegion);
+  if (sel === "world") return [...ALL_STATES.map(usRegion), ...Object.keys(COUNTRY_CITIES).map(countryRegion)];
+
+  const out: Region[] = [];
+  for (const raw of selector.split(",").map((s) => s.trim())) {
+    const up = raw.toUpperCase();
+    const aliased = COUNTRY_ALIASES[raw.toLowerCase()];
+    if (STATE_CITIES[up]) out.push(usRegion(up));
+    else if (aliased) out.push(countryRegion(aliased));
+    else if (COUNTRY_CITIES[raw]) out.push(countryRegion(raw));
+  }
+  return out;
+}
+
+/**
  * Local-business niches that (a) are everywhere, (b) frequently lack a real
  * website, and (c) are good web-design / remodel clients. Pass "allbiz" to the
  * batch to rotate through all of these per city.

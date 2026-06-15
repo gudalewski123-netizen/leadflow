@@ -143,12 +143,18 @@ function render() {
     [stats.replied ?? 0, "Replied", false],
   ].map(([n, l, hot]) => `<div class="stat${hot ? " hot" : ""}"><span class="n">${(+n).toLocaleString()}</span><span class="l">${l}</span></div>`).join("");
 
-  // populate the state dropdown with per-state to-contact counts
+  // populate the location dropdown — US states plus any countries present in the
+  // data (international regions are stored under their full name, e.g. "Poland").
   const counts = {};
   for (const l of leads) if (l.state && l.status === "new") counts[l.state] = (counts[l.state] ?? 0) + 1;
+  const countries = [...new Set(leads.map((l) => l.state).filter((s) => s && !US_STATES.includes(s)))].sort();
   const sel = $("#stateSel");
-  sel.innerHTML = `<option value="all">All states (${leads.filter((l) => l.status === "new").length})</option>` +
-    US_STATES.map((s) => `<option value="${s}" ${s === stateFilter ? "selected" : ""}>${s} (${counts[s] ?? 0})</option>`).join("");
+  sel.innerHTML = `<option value="all">All locations (${leads.filter((l) => l.status === "new").length})</option>` +
+    (countries.length ? `<optgroup label="Countries">` +
+      countries.map((s) => `<option value="${s}" ${s === stateFilter ? "selected" : ""}>🌍 ${s} (${counts[s] ?? 0})</option>`).join("") +
+      `</optgroup><optgroup label="US States">` : "") +
+    US_STATES.map((s) => `<option value="${s}" ${s === stateFilter ? "selected" : ""}>${s} (${counts[s] ?? 0})</option>`).join("") +
+    (countries.length ? `</optgroup>` : "");
 
   // populate the business-type dropdown from whatever niches are actually present
   const nicheCounts = {};

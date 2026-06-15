@@ -111,7 +111,9 @@ export function buildRegions(selector: string): Region[] {
   const sel = selector.toLowerCase().trim();
   if (sel === "us" || sel === "all") return ALL_STATES.map(usRegion);
   if (sel === "intl" || sel === "international") return Object.keys(COUNTRY_CITIES).map(countryRegion);
-  if (sel === "world") return [...ALL_STATES.map(usRegion), ...Object.keys(COUNTRY_CITIES).map(countryRegion)];
+  // countries first so international leads (the whole point of "world") show up
+  // fast instead of waiting behind all 50 US states in the queue
+  if (sel === "world") return [...Object.keys(COUNTRY_CITIES).map(countryRegion), ...ALL_STATES.map(usRegion)];
 
   const out: Region[] = [];
   for (const raw of selector.split(",").map((s) => s.trim())) {

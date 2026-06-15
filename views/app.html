@@ -106,6 +106,12 @@
       <select class="state" id="stateSel" onchange="setState(this.value)"></select>
       <select class="state" id="nicheSel" onchange="setNiche(this.value)"></select>
       <select class="state" id="chanSel" onchange="setChan(this.value)"></select>
+      <select class="state" id="revSel" onchange="setMinRev(this.value)">
+        <option value="0">Any reviews</option>
+        <option value="5">★ 5+ reviews</option>
+        <option value="15">★ 15+ reviews</option>
+        <option value="40">★ 40+ reviews</option>
+      </select>
     </div>
   </div>
 </header>
@@ -115,7 +121,7 @@ const FILTERS = [
   ["new", "To contact"], ["no_site", "No website"], ["bad_site", "Bad site"],
   ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
-let leads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", stats = {};
+let leads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", minRev = 0, stats = {};
 let renderLimit = 60;
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const COUNTRIES = ["United Kingdom","Ireland","Poland","Germany","France","Spain","Italy","Netherlands","Belgium","Portugal","Switzerland","Austria","Sweden","Norway","Denmark","Finland","Czechia","Romania","Greece","Canada","Mexico","Brazil","Australia","New Zealand","United Arab Emirates","South Africa"];
@@ -185,6 +191,7 @@ function render() {
     if (nicheFilter !== "all" && l.niche !== nicheFilter) return false;
     if (chanFilter === "ig" && !l.ig_handle) return false;
     if (chanFilter === "phone" && l.ig_handle) return false;
+    if (minRev > 0 && (l.reviews ?? 0) < minRev) return false;
     if (active === "all") return true;
     if (active === "new") return l.status === "new";
     if (active === "sent" || active === "replied") return l.status === active;
@@ -265,6 +272,7 @@ window.setState = (s) => { stateFilter = s; renderLimit = 60; render(); };
 window.setCountry = (c) => { stateFilter = c === "all" ? "all" : c; renderLimit = 60; render(); };
 window.setNiche = (n) => { nicheFilter = n; renderLimit = 60; render(); };
 window.setChan = (c) => { chanFilter = c; renderLimit = 60; render(); };
+window.setMinRev = (n) => { minRev = +n; renderLimit = 60; render(); };
 
 async function copyText(text) {
   try {

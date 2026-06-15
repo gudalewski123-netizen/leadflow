@@ -11,6 +11,7 @@
     "batch": "tsx src/batch.ts",
     "enrich": "tsx src/enrich.ts",
     "draft": "tsx src/draft.ts",
+    "freshness": "tsx src/freshness.ts",
     "dash": "tsx src/dash.ts",
     "start": "tsx src/dash.ts",
     "handles": "tsx src/handles.ts"

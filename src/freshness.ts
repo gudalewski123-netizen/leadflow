@@ -53,16 +53,23 @@ const leads = (
 ).rows as { id: number; name: string; ig_handle: string }[];
 
 console.log(`Checking recency for ${leads.length} on-Instagram leads (stale = no post in ${STALE_MONTHS} months)...\n`);
-let dead = 0, checked = 0, rl = 0;
+let dead = 0, checked = 0;
 
 for (const l of leads) {
-  const ts = await latestPostTs(l.ig_handle);
-  if (ts === "rl") {
-    if (++rl >= 6) { console.log("Instagram is rate-limiting — stopping, will resume next run."); break; }
-    await sleep(300000); // back off 5 min on rate limit
-    continue;
+  // On 429, back off (progressively, capped at 10 min) and RETRY the same lead —
+  // never give up. This lets the pass start now and auto-begin the moment
+  // Instagram's rate limit eases, instead of waiting on a fixed timer.
+  let ts: number | null | "rl" = "rl";
+  let rlStreak = 0;
+  while (ts === "rl") {
+    ts = await latestPostTs(l.ig_handle);
+    if (ts === "rl") {
+      rlStreak++;
+      const wait = Math.min(600000, 60000 * rlStreak);
+      console.log(`  rate-limited, backing off ${Math.round(wait / 60000)}min...`);
+      await sleep(wait);
+    }
   }
-  rl = 0;
   if (ts !== null) {
     checked++;
     await pool.query("UPDATE leads SET last_active = to_timestamp($1) WHERE id = $2", [ts, l.id]);

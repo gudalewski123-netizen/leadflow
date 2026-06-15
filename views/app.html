@@ -109,7 +109,7 @@
       <select class="state" id="revSel" onchange="setMinRev(this.value)">
         <option value="0">Any reviews</option>
         <option value="5">★ 5+ reviews</option>
-        <option value="15" selected>★ 15+ reviews</option>
+        <option value="15">★ 15+ reviews</option>
         <option value="40">★ 40+ reviews</option>
         <option value="100">★ 100+ reviews</option>
       </select>
@@ -122,8 +122,10 @@ const FILTERS = [
   ["new", "To contact"], ["no_site", "No website"], ["bad_site", "Bad site"],
   ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
-let leads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", minRev = 15, stats = {};
-let renderLimit = 60;
+let pageLeads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", minRev = 0;
+let stats = {}, facets = { regionCounts: {}, nicheCounts: {}, ig: 0, phone: 0 };
+let total = 0, offset = 0, loading = false;
+const PAGE = 60;
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const COUNTRIES = ["United Kingdom","Ireland","Poland","Germany","France","Spain","Italy","Netherlands","Belgium","Portugal","Switzerland","Austria","Sweden","Norway","Denmark","Finland","Czechia","Romania","Greece","Canada","Mexico","Brazil","Australia","New Zealand","United Arab Emirates","South Africa"];
 
@@ -152,68 +154,63 @@ function render() {
     [stats.replied ?? 0, "Replied", false],
   ].map(([n, l, hot]) => `<div class="stat${hot ? " hot" : ""}"><span class="n">${(+n).toLocaleString()}</span><span class="l">${l}</span></div>`).join("");
 
-  // per-region to-contact counts
-  const counts = {};
-  for (const l of leads) if (l.state && l.status === "new") counts[l.state] = (counts[l.state] ?? 0) + 1;
-
-  // dedicated Country dropdown — only lists countries that actually have leads
-  const usTotal = leads.filter((l) => l.status === "new" && US_STATES.includes(l.state)).length;
+  // dropdown counts come from /api/facets (computed in SQL over the to-contact pool)
+  const counts = facets.regionCounts || {};
+  const usTotal = US_STATES.reduce((n, s) => n + (counts[s] ?? 0), 0);
   const presentCountries = COUNTRIES.filter((c) => counts[c]);
   const usSelected = stateFilter === "__us__" || US_STATES.includes(stateFilter);
   $("#countrySel").innerHTML =
     `<option value="all" ${stateFilter === "all" ? "selected" : ""}>🌍 All locations</option>` +
-    `<option value="__us__" ${usSelected ? "selected" : ""}>🇺🇸 United States (${usTotal})</option>` +
+    `<option value="__us__" ${usSelected ? "selected" : ""}>🇺🇸 United States (${usTotal.toLocaleString()})</option>` +
     presentCountries.map((c) => `<option value="${c}" ${c === stateFilter ? "selected" : ""}>${c} (${counts[c]})</option>`).join("");
 
-  // US state dropdown (only meaningful when viewing the US)
-  const sel = $("#stateSel");
-  sel.innerHTML = `<option value="all">All US states (${usTotal})</option>` +
+  $("#stateSel").innerHTML = `<option value="all">All US states (${usTotal.toLocaleString()})</option>` +
     US_STATES.map((s) => `<option value="${s}" ${s === stateFilter ? "selected" : ""}>${s} (${counts[s] ?? 0})</option>`).join("");
 
-  // populate the business-type dropdown from whatever niches are actually present
-  const nicheCounts = {};
-  for (const l of leads) if (l.niche && l.status === "new") nicheCounts[l.niche] = (nicheCounts[l.niche] ?? 0) + 1;
-  const nicheList = Object.keys(nicheCounts).sort();
-  const nsel = $("#nicheSel");
-  nsel.innerHTML = `<option value="all">All types</option>` +
-    nicheList.map((n) => `<option value="${n}" ${n === nicheFilter ? "selected" : ""}>${n} (${nicheCounts[n]})</option>`).join("");
+  const nicheList = Object.keys(facets.nicheCounts || {}).sort();
+  $("#nicheSel").innerHTML = `<option value="all">All types</option>` +
+    nicheList.map((n) => `<option value="${n}" ${n === nicheFilter ? "selected" : ""}>${n} (${facets.nicheCounts[n]})</option>`).join("");
 
-  // contact-channel dropdown: work Instagram and phone leads separately
-  const igCount = leads.filter((l) => l.ig_handle && l.status === "new").length;
-  const phoneCount = leads.filter((l) => !l.ig_handle && l.phone && l.status === "new").length;
   $("#chanSel").innerHTML =
     `<option value="all" ${chanFilter === "all" ? "selected" : ""}>All channels</option>` +
-    `<option value="ig" ${chanFilter === "ig" ? "selected" : ""}>📷 On Instagram (${igCount})</option>` +
-    `<option value="phone" ${chanFilter === "phone" ? "selected" : ""}>📱 Phone only (${phoneCount})</option>`;
+    `<option value="ig" ${chanFilter === "ig" ? "selected" : ""}>📷 On Instagram (${(facets.ig ?? 0).toLocaleString()})</option>` +
+    `<option value="phone" ${chanFilter === "phone" ? "selected" : ""}>📱 Phone only (${(facets.phone ?? 0).toLocaleString()})</option>`;
 
-  const shown = leads.filter((l) => {
-    if (stateFilter === "__us__") { if (!US_STATES.includes(l.state)) return false; }
-    else if (stateFilter !== "all" && l.state !== stateFilter) return false;
-    if (nicheFilter !== "all" && l.niche !== nicheFilter) return false;
-    if (chanFilter === "ig" && !l.ig_handle) return false;
-    if (chanFilter === "phone" && l.ig_handle) return false;
-    if (minRev > 0 && (l.reviews ?? 0) < minRev) return false;
-    if (active === "all") return true;
-    if (active === "new") return l.status === "new";
-    if (active === "sent" || active === "replied") return l.status === active;
-    return l.category === active && l.status === "new";
-  });
-
-  // Only render a chunk of cards at a time — rendering thousands of textareas
-  // at once is what made the page lag. A "Show more" button reveals the rest.
-  if (!shown.length) {
-    $("#list").innerHTML = `<div class="empty">Nothing here yet. Run a scan to add leads.</div>`;
+  // pageLeads is already filtered + ordered by the server; just render it
+  if (!pageLeads.length) {
+    $("#list").innerHTML = loading
+      ? `<div class="empty">Loading…</div>`
+      : `<div class="empty">No leads match these filters.</div>`;
     return;
   }
-  const slice = shown.slice(0, renderLimit);
-  let html = slice.map(card).join("");
-  if (shown.length > renderLimit) {
-    html += `<button class="ghost more" onclick="showMore()">Show more — ${(shown.length - renderLimit).toLocaleString()} of ${shown.length.toLocaleString()} remaining</button>`;
+  let html = pageLeads.map(card).join("");
+  if (pageLeads.length < total) {
+    html += `<button class="ghost more" onclick="showMore()">${loading ? "Loading…" : `Show more — ${(total - pageLeads.length).toLocaleString()} of ${total.toLocaleString()} remaining`}</button>`;
   }
   $("#list").innerHTML = html;
 }
 
-window.showMore = () => { renderLimit += 60; render(); };
+function leadQuery(off) {
+  return `/api/leads?status=${active}&region=${encodeURIComponent(stateFilter)}` +
+    `&niche=${encodeURIComponent(nicheFilter)}&chan=${chanFilter}&minrev=${minRev}&offset=${off}&limit=${PAGE}`;
+}
+
+// load the first page for the current filters (reset)
+async function loadPage() {
+  loading = true; offset = 0; render();
+  const r = await api(leadQuery(0));
+  pageLeads = r.leads; total = r.total; offset = r.leads.length;
+  loading = false; render();
+}
+
+// append the next page
+window.showMore = async () => {
+  if (loading || pageLeads.length >= total) return;
+  loading = true; render();
+  const r = await api(leadQuery(offset));
+  pageLeads = pageLeads.concat(r.leads); total = r.total; offset += r.leads.length;
+  loading = false; render();
+};
 
 function card(l) {
   const cat = l.category ? badge(l.category, ({no_site:"NO SITE",bad_site:`WEAK SITE ${l.site_score}`,ok_site:`OK SITE ${l.site_score}`})[l.category]) : "";
@@ -268,12 +265,12 @@ function msgFor(l) {
   return `Hey! I design websites for local businesses and noticed ${name} doesn't have one yet. I'd love to put together a free mockup so you can see what it could look like — no pressure at all. Let me know if you're interested!`;
 }
 
-window.setFilter = (k) => { active = k; renderLimit = 60; render(); };
-window.setState = (s) => { stateFilter = s; renderLimit = 60; render(); };
-window.setCountry = (c) => { stateFilter = c === "all" ? "all" : c; renderLimit = 60; render(); };
-window.setNiche = (n) => { nicheFilter = n; renderLimit = 60; render(); };
-window.setChan = (c) => { chanFilter = c; renderLimit = 60; render(); };
-window.setMinRev = (n) => { minRev = +n; renderLimit = 60; render(); };
+window.setFilter = (k) => { active = k; loadPage(); };
+window.setState = (s) => { stateFilter = s; loadPage(); };
+window.setCountry = (c) => { stateFilter = c === "all" ? "all" : c; loadPage(); };
+window.setNiche = (n) => { nicheFilter = n; loadPage(); };
+window.setChan = (c) => { chanFilter = c; loadPage(); };
+window.setMinRev = (n) => { minRev = +n; loadPage(); };
 
 async function copyText(text) {
   try {
@@ -305,7 +302,7 @@ function igDestination(l) {
 }
 
 window.copyOpen = async (id, btn) => {
-  const l = leads.find((x) => x.id === id);
+  const l = pageLeads.find((x) => x.id === id);
 
   // Open the tab FIRST, synchronously inside the click — if we await the copy
   // before opening, the browser no longer sees a user gesture and the popup
@@ -329,7 +326,7 @@ window.copyOpen = async (id, btn) => {
 };
 
 window.copyText2 = async (id, btn) => {
-  const l = leads.find((x) => x.id === id);
+  const l = pageLeads.find((x) => x.id === id);
   // open the Messages app FIRST (before the await) so the popup blocker doesn't
   // kill it, with the number + the message pre-filled
   window.open(`sms:${phoneDigits(l.phone)}?&body=${encodeURIComponent(msgFor(l))}`, "_blank");
@@ -344,26 +341,27 @@ window.copyText2 = async (id, btn) => {
 };
 
 window.setStatus = async (id, status) => {
-  // update in memory + repaint instead of re-downloading all 6k+ leads
-  const l = leads.find((x) => x.id === id);
-  if (l) l.status = status;
+  // the lead leaves the current view — drop it from the page and repaint instantly
+  pageLeads = pageLeads.filter((x) => x.id !== id);
+  total = Math.max(0, total - 1);
   render();
   await api(`/api/leads/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ status }) });
-  stats = await api("/api/stats"); // light refresh for the counters
+  // refresh the counters + dropdown facets in the background
+  [stats, facets] = await Promise.all([api("/api/stats"), api("/api/facets")]);
   render();
 };
 window.saveMsg = (id, message) => {
-  const l = leads.find((x) => x.id === id);
+  const l = pageLeads.find((x) => x.id === id);
   if (l) l.message = message;
   return api(`/api/leads/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ message }) });
 };
 window.findIg = (id) => {
-  const l = leads.find((x) => x.id === id);
+  const l = pageLeads.find((x) => x.id === id);
   const q = encodeURIComponent(`"${l.name}" ${l.area ?? ""} instagram`);
   window.open(`https://www.google.com/search?q=${q}`, "_blank");
 };
 window.saveIg = async (id, ig_handle) => {
-  const l = leads.find((x) => x.id === id);
+  const l = pageLeads.find((x) => x.id === id);
   if (l) l.ig_handle = ig_handle.replace(/^@/, "");
   render();
   await api(`/api/leads/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ ig_handle }) });
@@ -374,8 +372,9 @@ window.logout = async () => {
 };
 
 async function load() {
-  [leads, stats] = await Promise.all([api("/api/leads"), api("/api/stats")]);
-  render();
+  // fetch stats + dropdown facets + the first page — each is small and fast now
+  [stats, facets] = await Promise.all([api("/api/stats"), api("/api/facets")]);
+  await loadPage();
 }
 load();
 </script>

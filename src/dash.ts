@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
 import { findIgHandle } from "./findig.js";
+import { ALL_STATES } from "./cities.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const APP_PASSWORD = process.env.APP_PASSWORD;
@@ -86,11 +87,58 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
-app.get("/api/leads", async (_req, res) => {
-  const { rows } = await pool.query(
-    "SELECT * FROM leads ORDER BY (status = 'new') DESC, site_score ASC NULLS FIRST, reviews DESC NULLS LAST"
-  );
-  res.json(rows);
+// Filtered + paginated leads — the dashboard fetches only the page it's showing,
+// so it loads instantly no matter how big the database gets.
+app.get("/api/leads", async (req, res) => {
+  const q = req.query;
+  const status = String(q.status ?? "no_site");
+  const region = String(q.region ?? "all");
+  const niche = String(q.niche ?? "all");
+  const chan = String(q.chan ?? "all");
+  const minrev = parseInt(String(q.minrev ?? "0")) || 0;
+  const limit = Math.min(parseInt(String(q.limit ?? "60")) || 60, 200);
+  const offset = parseInt(String(q.offset ?? "0")) || 0;
+
+  const conds: string[] = [];
+  const params: any[] = [];
+  const p = (v: any) => { params.push(v); return "$" + params.length; };
+
+  if (status === "new") conds.push("status='new'");
+  else if (status === "no_site") conds.push("status='new'", "category='no_site'");
+  else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
+  else if (status === "sent") conds.push("status='sent'");
+  else if (status === "replied") conds.push("status='replied'");
+  else conds.push("status NOT IN ('dead','skip')"); // "all" — hide dead/skipped
+
+  if (region === "__us__") conds.push(`state = ANY(${p(ALL_STATES)})`);
+  else if (region !== "all") conds.push(`state = ${p(region)}`);
+  if (niche !== "all") conds.push(`niche = ${p(niche)}`);
+  if (chan === "ig") conds.push("ig_handle IS NOT NULL");
+  else if (chan === "phone") conds.push("ig_handle IS NULL AND phone IS NOT NULL");
+  if (minrev > 0) conds.push(`COALESCE(reviews,0) >= ${p(minrev)}`);
+
+  const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+  const total = (await pool.query(`SELECT COUNT(*)::int c FROM leads ${where}`, params)).rows[0].c;
+  const rows = (await pool.query(
+    `SELECT * FROM leads ${where} ORDER BY reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
+    params
+  )).rows;
+  res.json({ leads: rows, total });
+});
+
+// Dropdown counts (per-region, per-niche, channel) over the to-contact pool —
+// computed in SQL so the client never needs the full lead list.
+app.get("/api/facets", async (_req, res) => {
+  const [states, niches, chan] = await Promise.all([
+    pool.query("SELECT state, COUNT(*)::int n FROM leads WHERE status='new' AND state IS NOT NULL GROUP BY state"),
+    pool.query("SELECT niche, COUNT(*)::int n FROM leads WHERE status='new' AND niche IS NOT NULL GROUP BY niche"),
+    pool.query("SELECT COUNT(*) FILTER (WHERE ig_handle IS NOT NULL)::int ig, COUNT(*) FILTER (WHERE ig_handle IS NULL AND phone IS NOT NULL)::int phone FROM leads WHERE status='new'"),
+  ]);
+  const regionCounts: Record<string, number> = {};
+  for (const r of states.rows) regionCounts[r.state] = r.n;
+  const nicheCounts: Record<string, number> = {};
+  for (const r of niches.rows) nicheCounts[r.niche] = r.n;
+  res.json({ regionCounts, nicheCounts, ig: chan.rows[0].ig, phone: chan.rows[0].phone });
 });
 
 app.get("/api/stats", async (_req, res) => {

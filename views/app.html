@@ -229,11 +229,18 @@ function card(l) {
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function phoneDigits(p) { return String(p).replace(/[^\d+]/g, ""); }
 
-// One simple, friendly template so no lead is ever blank. Uses the AI draft if
-// one exists, otherwise fills the business name into a clean default.
+// One simple, friendly template so no lead is ever blank.
 function msgFor(l) {
-  if (l.message && l.message.trim()) return l.message;
   const name = l.name || "your business";
+  // A business that's ON Instagram usually has a website linked in their bio even
+  // when Google Maps shows none — so NEVER tell them "you don't have a website."
+  // Use a neutral pitch that works whether it's a first site or an upgrade.
+  if (l.ig_handle) {
+    if (l.message && l.message.trim() && !/(don'?t|doesn'?t|do not|does not)\s+have\s+(a\s+)?(website|site|one)/i.test(l.message))
+      return l.message;
+    return `Hey! I design clean, modern websites for local ${l.niche ?? "businesses"} and came across ${name}. I'd love to put together a free mockup showing what a polished site could look like for you — whether it's a first site or an upgrade. No pressure at all, just thought it might be useful!`;
+  }
+  if (l.message && l.message.trim()) return l.message;
   if (l.category === "bad_site")
     return `Hey! I design websites for local businesses and noticed ${name}'s site could use a refresh. I'd love to put together a free mockup so you can see what an updated version could look like — no pressure at all. Let me know if you're interested!`;
   return `Hey! I design websites for local businesses and noticed ${name} doesn't have one yet. I'd love to put together a free mockup so you can see what it could look like — no pressure at all. Let me know if you're interested!`;

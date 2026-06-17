@@ -65,8 +65,10 @@ for (const l of leads) {
     ts = await latestPostTs(l.ig_handle);
     if (ts === "rl") {
       rlStreak++;
-      const wait = Math.min(600000, 60000 * rlStreak);
-      console.log(`  rate-limited, backing off ${Math.round(wait / 60000)}min...`);
+      // back off hard (up to 30 min) so we stop nagging Instagram and let the
+      // account's penalty actually lift — then it auto-resumes on the next try.
+      const wait = Math.min(1800000, 120000 * rlStreak);
+      console.log(`  rate-limited, resting ${Math.round(wait / 60000)}min...`);
       await sleep(wait);
     }
   }

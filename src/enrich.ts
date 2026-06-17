@@ -85,6 +85,17 @@ async function igProfileExists(handle: string): Promise<boolean> {
 
 // Try several search engines; the business name + location + "instagram".
 // DuckDuckGo rate-limits fast, so Bing is the workhorse fallback.
+// AEO = Answer Engine Optimization. The foundation is schema.org structured data
+// (JSON-LD), which AI answer engines (ChatGPT, Perplexity, Google AI) rely on to
+// understand and surface a business. A site with no JSON-LD has essentially no
+// AEO — a perfect "I'll get you showing up in AI search" pitch.
+function hasAeo(html: string): boolean {
+  for (const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    if (/schema\.org/i.test(m[1])) return true;
+  }
+  return false;
+}
+
 async function findIgViaSearch(name: string, area: string): Promise<string | null> {
   const q = `${name} ${area} instagram`;
   const engines = [
@@ -115,7 +126,12 @@ async function findIgViaSearch(name: string, area: string): Promise<string | nul
 await init();
 const leads = (
   await pool.query(
-    "SELECT * FROM leads WHERE site_score IS NULL OR (ig_handle IS NULL AND status = 'new')"
+    `SELECT * FROM leads
+     WHERE site_score IS NULL
+        OR (ig_handle IS NULL AND status = 'new')
+        OR (website IS NOT NULL AND has_aeo IS NULL AND status = 'new')
+     ORDER BY (site_score IS NULL) DESC
+     LIMIT 400`
   )
 ).rows as Lead[];
 
@@ -126,30 +142,35 @@ for (const lead of leads) {
   let category = lead.category ?? "no_site";
   let site_notes = lead.site_notes ?? "";
   let ig_handle: string | null = lead.ig_handle;
+  let has_aeo: boolean | null = lead.has_aeo ?? null;
 
-  if (lead.website && lead.site_score === null) {
+  // fetch the site if it's never been scored OR never been AEO-checked
+  if (lead.website && (lead.site_score === null || lead.has_aeo == null)) {
+    const needsScore = lead.site_score === null;
     try {
       const { ok, html, finalUrl, status } = await fetchText(lead.website);
       if (!ok) {
-        site_score = 5;
-        category = "bad_site";
-        site_notes = `site returns HTTP ${status}`;
+        if (needsScore) { site_score = 5; category = "bad_site"; site_notes = `site returns HTTP ${status}`; }
+        has_aeo = false;
       } else {
-        const { score, notes } = scoreSite(html, finalUrl);
-        site_score = score;
-        category = score < 55 ? "bad_site" : "ok_site";
-        site_notes = notes.join(", ") || "looks decent";
-        if (!ig_handle) ig_handle = igFromHtml(html);
+        if (needsScore) {
+          const { score, notes } = scoreSite(html, finalUrl);
+          site_score = score;
+          category = score < 55 ? "bad_site" : "ok_site";
+          site_notes = notes.join(", ") || "looks decent";
+          if (!ig_handle) ig_handle = igFromHtml(html);
+        }
+        has_aeo = hasAeo(html); // structured data present?
       }
     } catch (e) {
-      site_score = 0;
-      category = "bad_site";
-      site_notes = `site unreachable (${(e as Error).name})`;
+      if (needsScore) { site_score = 0; category = "bad_site"; site_notes = `site unreachable (${(e as Error).name})`; }
+      has_aeo = false;
     }
   } else if (!lead.website) {
     site_score = 0;
     category = "no_site";
     site_notes = "no website at all";
+    has_aeo = false; // no site → no AEO (but these are website-pitch leads)
   }
 
   // The search-engine IG lookup is slow (~4s/lead) and low-yield, so it's gated
@@ -161,8 +182,8 @@ for (const lead of leads) {
   }
 
   await pool.query(
-    "UPDATE leads SET site_score=$1, site_notes=$2, category=$3, ig_handle=COALESCE($4, ig_handle) WHERE id=$5",
-    [site_score, site_notes, category, ig_handle, lead.id]
+    "UPDATE leads SET site_score=$1, site_notes=$2, category=$3, ig_handle=COALESCE($4, ig_handle), has_aeo=$5 WHERE id=$6",
+    [site_score, site_notes, category, ig_handle, has_aeo, lead.id]
   );
   console.log(
     `  ${lead.name}: ${category} (${site_score})${ig_handle ? ` @${ig_handle}` : " [no IG found]"}`

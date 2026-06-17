@@ -119,7 +119,7 @@
 <main id="list"><div class="empty">Loading…</div></main>
 <script>
 const FILTERS = [
-  ["new", "To contact"], ["no_site", "No website"], ["bad_site", "Bad site"],
+  ["new", "To contact"], ["no_site", "No website"], ["no_aeo", "No AEO"], ["bad_site", "Bad site"],
   ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
 let pageLeads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", minRev = 0;
@@ -251,6 +251,10 @@ function phoneDigits(p) { return String(p).replace(/[^\d+]/g, ""); }
 // One simple, friendly template so no lead is ever blank.
 function msgFor(l) {
   const name = l.name || "your business";
+  // When working the No-AEO list, pitch AI-search visibility, not a new website.
+  if (active === "no_aeo") {
+    return `Hey! I help local ${l.niche ?? "businesses"} show up when people ask ChatGPT, Siri, or Google's AI for recommendations. I had a look at ${name}'s site and it isn't set up for AI search yet — which is fast becoming how people find businesses. I'd love to show you a quick free example of what it could look like. No pressure at all!`;
+  }
   // A business that's ON Instagram usually has a website linked in their bio even
   // when Google Maps shows none — so NEVER tell them "you don't have a website."
   // Use a neutral pitch that works whether it's a first site or an upgrade.

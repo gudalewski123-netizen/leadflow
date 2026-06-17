@@ -106,6 +106,8 @@ app.get("/api/leads", async (req, res) => {
   if (status === "new") conds.push("status='new'");
   else if (status === "no_site") conds.push("status='new'", "category='no_site'");
   else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
+  // No AEO: has a website but no schema.org structured data — pitch AI-search visibility
+  else if (status === "no_aeo") conds.push("status='new'", "website IS NOT NULL", "has_aeo = false");
   else if (status === "sent") conds.push("status='sent'");
   else if (status === "replied") conds.push("status='replied'");
   else conds.push("status NOT IN ('dead','skip')"); // "all" — hide dead/skipped

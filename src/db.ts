@@ -53,6 +53,7 @@ export async function init() {
     );
   `);
   await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS state TEXT");
+  await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS has_aeo BOOLEAN"); // schema.org structured data present?
   // backfill state from trailing 2-letter code in area, e.g. "Miami FL" -> FL
   await pool.query(
     "UPDATE leads SET state = upper(substring(area from '([A-Za-z]{2})\\s*$')) WHERE state IS NULL AND area ~ '[A-Za-z]{2}\\s*$'"
@@ -75,6 +76,7 @@ export interface Lead {
   site_score: number | null;
   site_notes: string | null;
   category: string | null;
+  has_aeo: boolean | null;
   message: string | null;
   status: string;
   created_at: string;

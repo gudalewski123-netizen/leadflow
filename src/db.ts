@@ -54,6 +54,29 @@ export async function init() {
   `);
   await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS state TEXT");
   await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS has_aeo BOOLEAN"); // schema.org structured data present?
+
+  // Follow-up tracking. Without this a lead goes new -> sent and is finished
+  // forever, so every business gets exactly one touch — but most replies to cold
+  // outreach come on touch 2 or 3, so a single-shot pipeline throws away the
+  // majority of its own replies.
+  await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS touches INT NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE leads ADD COLUMN IF NOT EXISTS last_touch_at TIMESTAMPTZ");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS outreach (
+      id SERIAL PRIMARY KEY,
+      lead_id INT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+      channel TEXT NOT NULL DEFAULT 'ig',
+      touch_no INT NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      note TEXT
+    );
+  `);
+  await pool.query("CREATE INDEX IF NOT EXISTS outreach_lead_idx ON outreach(lead_id)");
+  // Existing 'sent' rows predate touch tracking — treat them as one touch so
+  // they enter the follow-up rotation instead of being invisible.
+  await pool.query(
+    "UPDATE leads SET touches = 1, last_touch_at = COALESCE(contacted_at, now()) WHERE status = 'sent' AND touches = 0"
+  );
   // backfill state from trailing 2-letter code in area, e.g. "Miami FL" -> FL
   await pool.query(
     "UPDATE leads SET state = upper(substring(area from '([A-Za-z]{2})\\s*$')) WHERE state IS NULL AND area ~ '[A-Za-z]{2}\\s*$'"

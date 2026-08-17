@@ -163,12 +163,17 @@ await pool.query(`
     ADD COLUMN IF NOT EXISTS ig_checked_at TIMESTAMPTZ
 `);
 
-// no_site leads first — they're the pitch we most want to make.
+// Handles sourced FROM Instagram go first — they're verified-real accounts, so
+// every second spent on them is productive. The legacy search-scraped handles
+// are mostly junk and would otherwise hog the queue (they have a category set,
+// which used to sort them ahead of the good ones).
 const leads = (
   await pool.query(
     `SELECT id, name, ig_handle, category FROM leads
      WHERE ig_handle IS NOT NULL AND status = 'new' AND ig_checked_at IS NULL
-     ORDER BY (category = 'no_site') DESC, COALESCE(reviews,0) DESC
+     ORDER BY (source = 'ig_search') DESC NULLS LAST,
+              (category = 'no_site') DESC,
+              COALESCE(reviews,0) DESC
      LIMIT $1`,
     [LIMIT]
   )

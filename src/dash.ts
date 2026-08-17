@@ -111,6 +111,15 @@ app.get("/api/leads", async (req, res) => {
   // Hot: scored by src/hot.ts from live Instagram data — recently posting AND
   // no real website in bio. The best prospects we can identify.
   else if (status === "hot") conds.push("status='new'", "hot_score >= 60");
+  // Follow-up due: messaged, never replied, and enough time has passed for
+  // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
+  // not persistent, you're a nuisance.
+  else if (status === "followup")
+    conds.push(
+      "status='sent'",
+      "touches < 3",
+      "last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)"
+    );
   else if (status === "sent") conds.push("status='sent'");
   else if (status === "replied") conds.push("status='replied'");
   else conds.push("status NOT IN ('dead','skip')"); // "all" — hide dead/skipped
@@ -173,11 +182,27 @@ app.post("/api/leads/:id", async (req, res) => {
     await pool.query("UPDATE leads SET message=$1 WHERE id=$2", [message, id]);
   if (ig_handle !== undefined)
     await pool.query("UPDATE leads SET ig_handle=$1 WHERE id=$2", [ig_handle.replace(/^@/, ""), id]);
-  if (status !== undefined)
-    await pool.query(
-      "UPDATE leads SET status=$1, contacted_at = CASE WHEN $1='sent' THEN now() ELSE contacted_at END WHERE id=$2",
-      [status, id]
-    );
+  if (status !== undefined) {
+    if (status === "sent") {
+      // Record a TOUCH rather than just flipping a flag, so the lead can come
+      // back for follow-up instead of disappearing after one message.
+      const r = await pool.query(
+        `UPDATE leads
+            SET status='sent', touches = touches + 1,
+                last_touch_at = now(),
+                contacted_at = COALESCE(contacted_at, now())
+          WHERE id=$1
+        RETURNING touches`,
+        [id]
+      );
+      await pool.query(
+        "INSERT INTO outreach (lead_id, channel, touch_no) VALUES ($1,$2,$3)",
+        [id, (req.body as any).channel ?? "ig", r.rows[0]?.touches ?? 1]
+      );
+    } else {
+      await pool.query("UPDATE leads SET status=$1 WHERE id=$2", [status, id]);
+    }
+  }
   res.json({ ok: true });
 });
 

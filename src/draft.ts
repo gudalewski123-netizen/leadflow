@@ -32,20 +32,23 @@ if (claudeAvailable) {
 }
 
 /**
- * Openers are deliberately 1-2 sentences. Long DMs from a stranger read as a
- * pitch and get ignored — the goal of message one is only to get a REPLY, which
- * also pulls you out of Instagram's Message Requests folder. The offer comes
- * after they answer.
+ * ONE universal opener for every lead — paste-ready, no editing, no per-lead
+ * personalization to check before sending.
+ *
+ * Deliberately no business name: the names sourced from Instagram are display
+ * names, not clean business names ("MobileDetailingMiami🚘🌊[EST.2020]"), and
+ * dropping one of those into a DM reads worse than using none.
+ *
+ * Deliberately one short question: a stranger's long DM reads as a pitch and
+ * gets ignored. Message one only has to earn a REPLY — which also pulls the
+ * thread out of Instagram's Message Requests folder. The offer comes after
+ * they answer.
  */
-function template(l: Lead): string {
-  const first = l.name.split(/\s+/).slice(0, 3).join(" ");
-  if (l.category === "no_site")
-    // Question-first: a yes/no question is the lowest-friction thing to answer,
-    // and "no" is itself the opening.
-    return `Hey! Quick question — do you have a website for ${first}? Couldn't find one linked on your page.`;
-  if (l.category === "bad_site")
-    return `Hey! Came across ${first} — quick thing, your site ${l.site_notes?.includes("mobile") ? "doesn't display right on phones" : "looks a bit dated"}. Want me to show you what I mean?`;
-  return `Hey! Came across ${first} and your work looks great. Do you have a website up for it yet?`;
+const OPENER =
+  "Hey! Quick question — do you have a website for your business? Couldn't find one linked on your page.";
+
+function template(_l: Lead): string {
+  return OPENER;
 }
 
 function aiDraft(l: Lead): string | null {

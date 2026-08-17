@@ -13,6 +13,8 @@
     "draft": "tsx src/draft.ts",
     "freshness": "tsx src/freshness.ts",
     "hot": "tsx src/hot.ts",
+    "igsource": "tsx src/igsource.ts",
+    "handlelist": "tsx src/handlelist.ts",
     "dash": "tsx src/dash.ts",
     "start": "tsx src/dash.ts",
     "handles": "tsx src/handles.ts"

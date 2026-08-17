@@ -31,13 +31,21 @@ if (claudeAvailable) {
   console.log("Using free templates (set AI_DRAFT=1 to personalize with AI).");
 }
 
+/**
+ * Openers are deliberately 1-2 sentences. Long DMs from a stranger read as a
+ * pitch and get ignored — the goal of message one is only to get a REPLY, which
+ * also pulls you out of Instagram's Message Requests folder. The offer comes
+ * after they answer.
+ */
 function template(l: Lead): string {
   const first = l.name.split(/\s+/).slice(0, 3).join(" ");
   if (l.category === "no_site")
-    return `Hey! I build websites for ${l.niche ?? "local"} businesses around ${l.area}. Noticed ${first} doesn't have a site yet — a simple one-pager with your services, photos and a contact/booking button usually pays for itself fast. I can send over a free mockup with no commitment if you're curious. Either way, keep up the great work!`;
+    // Question-first: a yes/no question is the lowest-friction thing to answer,
+    // and "no" is itself the opening.
+    return `Hey! Quick question — do you have a website for ${first}? Couldn't find one linked on your page.`;
   if (l.category === "bad_site")
-    return `Hey! I was checking out ${first} and noticed your website ${l.site_notes?.includes("mobile") ? "doesn't display right on phones" : "could use a refresh"} — most of your customers are finding you on their phone, so that's costing you calls. I redesign sites for ${l.niche ?? "local"} businesses around ${l.area}. Happy to send a free before/after mockup if you want to see what it could look like. No pressure either way!`;
-  return `Hey! I build and modernize websites for ${l.niche ?? "local"} businesses around ${l.area}. If you ever want a refresh of your current site or new features like online booking, I'd be glad to send over some ideas. Keep up the great work!`;
+    return `Hey! Came across ${first} — quick thing, your site ${l.site_notes?.includes("mobile") ? "doesn't display right on phones" : "looks a bit dated"}. Want me to show you what I mean?`;
+  return `Hey! Came across ${first} and your work looks great. Do you have a website up for it yet?`;
 }
 
 function aiDraft(l: Lead): string | null {

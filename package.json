@@ -13,6 +13,7 @@
     "draft": "tsx src/draft.ts",
     "freshness": "tsx src/freshness.ts",
     "hot": "tsx src/hot.ts",
+    "hot:apify": "tsx src/hotapify.ts",
     "igsource": "tsx src/igsource.ts",
     "handlelist": "tsx src/handlelist.ts",
     "dash": "tsx src/dash.ts",

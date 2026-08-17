@@ -16,12 +16,19 @@ const leads = (
 
 console.log(`Drafting messages for ${leads.length} leads...`);
 
-let claudeAvailable = true;
-try {
-  execFileSync("claude", ["--version"], { stdio: "pipe" });
-} catch {
-  claudeAvailable = false;
-  console.log("claude CLI not found — using templates only.");
+// Templates are the DEFAULT — they cost nothing and read fine. AI drafting is
+// opt-in via AI_DRAFT=1, because at batch scale (thousands of leads) one model
+// call per lead is the only part of this pipeline that costs money.
+let claudeAvailable = process.env.AI_DRAFT === "1";
+if (claudeAvailable) {
+  try {
+    execFileSync("claude", ["--version"], { stdio: "pipe" });
+  } catch {
+    claudeAvailable = false;
+    console.log("claude CLI not found — using templates only.");
+  }
+} else {
+  console.log("Using free templates (set AI_DRAFT=1 to personalize with AI).");
 }
 
 function template(l: Lead): string {

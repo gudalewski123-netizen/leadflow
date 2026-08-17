@@ -108,6 +108,9 @@ app.get("/api/leads", async (req, res) => {
   else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
   // No AEO: has a website but no schema.org structured data — pitch AI-search visibility
   else if (status === "no_aeo") conds.push("status='new'", "website IS NOT NULL", "has_aeo = false");
+  // Hot: scored by src/hot.ts from live Instagram data — recently posting AND
+  // no real website in bio. The best prospects we can identify.
+  else if (status === "hot") conds.push("status='new'", "hot_score >= 60");
   else if (status === "sent") conds.push("status='sent'");
   else if (status === "replied") conds.push("status='replied'");
   else conds.push("status NOT IN ('dead','skip')"); // "all" — hide dead/skipped
@@ -122,7 +125,9 @@ app.get("/api/leads", async (req, res) => {
   const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
   const total = (await pool.query(`SELECT COUNT(*)::int c FROM leads ${where}`, params)).rows[0].c;
   const rows = (await pool.query(
-    `SELECT * FROM leads ${where} ORDER BY reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
+    // hot_score leads the sort: reviews are NULL on ~99% of no-site leads, so
+    // ordering by reviews alone was effectively random.
+    `SELECT * FROM leads ${where} ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
     params
   )).rows;
   res.json({ leads: rows, total });

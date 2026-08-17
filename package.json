@@ -12,6 +12,7 @@
     "enrich": "tsx src/enrich.ts",
     "draft": "tsx src/draft.ts",
     "freshness": "tsx src/freshness.ts",
+    "hot": "tsx src/hot.ts",
     "dash": "tsx src/dash.ts",
     "start": "tsx src/dash.ts",
     "handles": "tsx src/handles.ts"

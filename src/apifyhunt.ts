@@ -149,6 +149,20 @@ async function worker() {
     const j = jobs[cursor++];
     if (!j) return;
 
+    // A transient network error (EHOSTUNREACH etc.) must not take the run down:
+    // workers sit in a Promise.all, so one rejection killed all 8 and lost the
+    // remaining queries. Swallow per-job failures and keep going.
+    try {
+      await runJob(j);
+    } catch (e: any) {
+      console.error(`  job failed (${j.niche} ${j.city}): ${e?.code ?? e?.message ?? e} — continuing`);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+}
+
+async function runJob(j: { niche: string; city: string; state: string }) {
+  {
     const items = await hunt(`${j.niche} ${j.city}`);
     queries++;
     if (queries % 20 === 0) await checkSpend(); // ~every 20 runs, cheap to poll

@@ -163,6 +163,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE status = 'new')::int AS to_contact,
       COUNT(*) FILTER (WHERE category = 'no_site' AND status = 'new')::int AS no_site,
+      COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60)::int AS hot,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today
     FROM leads

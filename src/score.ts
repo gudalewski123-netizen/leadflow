@@ -4,14 +4,26 @@
  */
 
 /**
- * Link-in-bio hosts that are NOT a real website — these leads stay hot.
- * Includes booking/CRM landing pages (Jobber, Housecall Pro, Thumbtack…): a
- * trades business linking one of those has a scheduling page, not a website,
- * and is still very much a prospect. Found this on @donsdetailing, whose only
- * link was go.getjobber.com — 28k followers and no actual site.
+ * Link-in-bio AGGREGATORS (Linktree, Beacons, Taplink, …) bundle several links
+ * behind one page — and very often one of those links is a real website
+ * (a franchise page, a corporate site, etc). Sampling hot leads on 2026-08-18
+ * turned up City of Tampa, Greenpeace Hong Kong, a former Rome mayor, and a
+ * 360 Painting franchise — all scored "hot" purely because their single
+ * linktr.ee link wasn't detected as a website. These get capped below the
+ * hot threshold: worth a look manually, never an auto-hot lead.
+ */
+export const LINK_AGGREGATOR =
+  /linktr\.ee|link\.tree|beacons\.ai|linkin\.bio|bio\.link|allmylinks|taplink|milkshake|campsite\.bio|msha\.ke|solo\.to|shorby/i;
+
+/**
+ * Single-purpose booking/CRM/social landing pages that are NOT a real website
+ * — these leads stay fully hot. A trades business linking one of these has a
+ * scheduling page or a social profile, not a website, and is still very much
+ * a prospect. Found this on @donsdetailing, whose only link was
+ * go.getjobber.com — 28k followers and no actual site.
  */
 export const NOT_A_SITE =
-  /linktr\.ee|link\.tree|beacons\.ai|linkin\.bio|bio\.link|allmylinks|taplink|milkshake|campsite\.bio|msha\.ke|solo\.to|shorby|facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
+  /facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
 
 export interface Profile {
   userId?: string | null;
@@ -42,16 +54,20 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
   }
 
   // 2. Bio link — the money signal.
+  let aggregator = false;
   if (!p.externalUrl) { s += 30; why.push("NO link in bio"); }
-  else if (NOT_A_SITE.test(p.externalUrl)) { s += 22; why.push("linktree/social only"); }
+  else if (LINK_AGGREGATOR.test(p.externalUrl)) { aggregator = true; why.push("link-in-bio page — may hide a real site"); }
+  else if (NOT_A_SITE.test(p.externalUrl)) { s += 22; why.push("booking/social page only"); }
 
   // 3. Treating IG as a business channel.
   if (p.isBusiness) { s += 10; why.push("business acct"); }
 
-  // 4. Real local audience — big enough to have revenue, small enough to need us.
+  // 4. Real local audience — big enough to have revenue, small enough to need
+  //    us. Above 50k followers gets no bonus at all: that's a chain, brand,
+  //    public figure, or org, not a small local business.
   if (p.followers != null) {
     if (p.followers >= 500 && p.followers <= 50000) { s += 10; why.push(`${p.followers} followers`); }
-    else if (p.followers >= 150) { s += 5; why.push(`${p.followers} followers`); }
+    else if (p.followers >= 150 && p.followers < 500) { s += 5; why.push(`${p.followers} followers`); }
   }
 
   // 5. Enough content to actually build a site from.
@@ -60,5 +76,6 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
   // 6. Public contact = a second channel that isn't a DM.
   if (p.email) { s += 5; why.push("public email"); }
 
-  return { score: Math.min(100, s), why };
+  const score = aggregator ? Math.min(s, 45) : Math.min(100, s);
+  return { score, why };
 }

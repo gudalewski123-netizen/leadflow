@@ -106,6 +106,26 @@ const known = new Set<string>(
 );
 console.log(`Known handles: ${known.size}. Target: ${TARGET} new.\n`);
 
+// Remember which (niche, city) queries have already been run. Without this a
+// re-run restarts at the top of the list and pays Apify to re-fetch handles we
+// already own — the last resumed run spent $0.91 to add 2 leads. Queries go
+// stale eventually, so they become eligible again after HUNT_REFRESH_DAYS.
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS hunt_queries (
+    query TEXT PRIMARY KEY,
+    ran_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    new_leads INT NOT NULL DEFAULT 0
+  );
+`);
+const REFRESH_DAYS = Number(process.env.HUNT_REFRESH_DAYS ?? 30);
+const doneQueries = new Set<string>(
+  (await pool.query(
+    `SELECT query FROM hunt_queries WHERE ran_at > now() - ($1 || ' days')::interval`,
+    [REFRESH_DAYS]
+  )).rows.map((r: any) => r.query)
+);
+console.log(`Queries already run in the last ${REFRESH_DAYS}d (will skip): ${doneQueries.size}`);
+
 // niche-major so every trade sweeps the country before the next one starts —
 // otherwise one niche in one state hogs the whole budget.
 const jobs: { niche: string; city: string; state: string }[] = [];
@@ -148,6 +168,10 @@ async function worker() {
     if (added >= TARGET || stoppedForBudget) return;
     const j = jobs[cursor++];
     if (!j) return;
+
+    const qkey = `${j.niche} ${j.city} ${j.state}`;
+    if (doneQueries.has(qkey)) continue; // already swept recently — don't pay again
+    doneQueries.add(qkey);
 
     // A transient network error (EHOSTUNREACH etc.) must not take the run down:
     // workers sit in a Promise.all, so one rejection killed all 8 and lost the
@@ -196,6 +220,12 @@ async function runJob(j: { niche: string; city: string; state: string }) {
         console.log(`  ${score >= 75 ? "🔥" : "✅"} ${String(score).padStart(3)} @${h}  ${why.join(", ")}`);
       }
     }
+
+    await pool.query(
+      `INSERT INTO hunt_queries (query, new_leads) VALUES ($1,$2)
+       ON CONFLICT (query) DO UPDATE SET ran_at = now(), new_leads = EXCLUDED.new_leads`,
+      [`${j.niche} ${j.city} ${j.state}`, newHere]
+    );
 
     if (newHere)
       console.log(`  [q${queries}] ${j.niche} ${j.city} ${j.state} — +${newHere} | ${added}/${TARGET}, ${hot} hot`);

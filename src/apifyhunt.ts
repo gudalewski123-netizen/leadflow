@@ -44,31 +44,61 @@ const ACTOR = "apify~instagram-scraper";
 // Aggregators, media and franchises — not local businesses we can sell to.
 const SKIP = /\b(magazine|academy|training|course|supply|supplies|products|official|news|daily|podcast|expo|association)\b/i;
 
-async function hunt(query: string): Promise<any[]> {
+/**
+ * Start the actor asynchronously and poll, rather than run-sync-get-dataset-items.
+ * The sync endpoint holds the HTTP connection open for the entire actor run; with
+ * several runs queued behind each other it blows past the sync timeout and the
+ * fetch dies — 87 of ~118 queries failed that way, and Apify still bills a run
+ * whose result we never read.
+ *
+ * Returns null on failure (so the caller can avoid recording the query as done)
+ * and an array on success, including a legitimately empty one.
+ */
+async function hunt(query: string): Promise<any[] | null> {
+  const input = {
+    search: query,
+    searchType: "user",
+    searchLimit: 20,
+    resultsType: "details",
+    resultsLimit: 5, // recent posts per profile — this is what carries recency
+    addParentData: false,
+  };
   try {
-    const r = await fetch(
-      `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${TOKEN}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          search: query,
-          searchType: "user",
-          searchLimit: 20,
-          resultsType: "details",
-          resultsLimit: 5, // recent posts per profile — this is what carries recency
-          addParentData: false,
-        }),
-      }
-    );
-    if (!r.ok) {
-      console.error(`  HTTP ${r.status} on "${query}"`);
-      return [];
+    const start = await fetch(`https://api.apify.com/v2/acts/${ACTOR}/runs?token=${TOKEN}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!start.ok) {
+      console.error(`  start failed HTTP ${start.status} on "${query}"`);
+      return null;
     }
-    return (await r.json()) as any[];
+    const runData = ((await start.json()) as any)?.data;
+    const runId = runData?.id;
+    const datasetId = runData?.defaultDatasetId;
+    if (!runId || !datasetId) return null;
+
+    // Poll for terminal state. Runs typically finish in 1-3 min.
+    for (let i = 0; i < 90; i++) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const st = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${TOKEN}`);
+      if (!st.ok) continue;
+      const status = ((await st.json()) as any)?.data?.status;
+      if (status === "SUCCEEDED") {
+        const ds = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${TOKEN}&clean=true`);
+        if (!ds.ok) return null;
+        return (await ds.json()) as any[];
+      }
+      if (["FAILED", "ABORTED", "TIMED-OUT"].includes(status)) {
+        console.error(`  run ${status} on "${query}"`);
+        return null;
+      }
+    }
+    console.error(`  run never finished on "${query}"`);
+    return null;
   } catch (e: any) {
     console.error(`  error on "${query}": ${e?.message}`);
-    return [];
+    return null;
   }
 }
 
@@ -139,7 +169,7 @@ let added = 0, hot = 0, queries = 0;
 // would take ~18h for a 5k target. Runs are independent, so pull jobs from a
 // shared cursor with a pool of workers instead. Concurrency is well under the
 // STARTER plan's run limit.
-const CONCURRENCY = Number(process.env.HUNT_CONCURRENCY ?? 8);
+const CONCURRENCY = Number(process.env.HUNT_CONCURRENCY ?? 4);
 let cursor = 0;
 
 // Hard spend ceiling. Cost per new lead varies with the dedupe rate (a niche
@@ -189,6 +219,9 @@ async function runJob(j: { niche: string; city: string; state: string }) {
   {
     const items = await hunt(`${j.niche} ${j.city}`);
     queries++;
+    // A failed run must NOT be recorded as swept, or that city is skipped for
+    // HUNT_REFRESH_DAYS despite never having been searched.
+    if (items === null) return;
     if (queries % 20 === 0) await checkSpend(); // ~every 20 runs, cheap to poll
     let newHere = 0;
 

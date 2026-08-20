@@ -119,7 +119,7 @@
 <main id="list"><div class="empty">Loading…</div></main>
 <script>
 const FILTERS = [
-  ["new", "To contact"], ["hot", "🔥 Hot"], ["no_site", "No website"], ["no_aeo", "No AEO"], ["bad_site", "Bad site"],
+  ["new", "To contact"], ["hot", "🔥 Hot"], ["new_business", "🌱 New Biz"], ["no_site", "No website"], ["no_aeo", "No AEO"], ["bad_site", "Bad site"],
   ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
 let pageLeads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", minRev = 0;
@@ -151,6 +151,7 @@ function render() {
     [stats.total ?? 0, "Total", false],
     [stats.no_site ?? 0, "No website", false],
     [stats.hot ?? 0, "🔥 Hot", true],
+    [stats.new_business ?? 0, "🌱 New Biz", false],
     [stats.sent_today ?? 0, "Sent today", false],
     [stats.replied ?? 0, "Replied", false],
   ].map(([n, l, hot]) => `<div class="stat${hot ? " hot" : ""}"><span class="n">${(+n).toLocaleString()}</span><span class="l">${l}</span></div>`).join("");

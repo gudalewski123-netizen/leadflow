@@ -111,6 +111,9 @@ app.get("/api/leads", async (req, res) => {
   // Hot: scored by src/hot.ts from live Instagram data — recently posting AND
   // no real website in bio. The best prospects we can identify.
   else if (status === "hot") conds.push("status='new'", "hot_score >= 60");
+  // New: few posts but posting recently — see isLikelyNewBusiness() in
+  // score.ts. Tagged into hot_why at scoring time.
+  else if (status === "new_business") conds.push("status='new'", "hot_why LIKE '%NEW BUSINESS%'");
   // Follow-up due: messaged, never replied, and enough time has passed for
   // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
   // not persistent, you're a nuisance.
@@ -164,6 +167,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*) FILTER (WHERE status = 'new')::int AS to_contact,
       COUNT(*) FILTER (WHERE category = 'no_site' AND status = 'new')::int AS no_site,
       COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60)::int AS hot,
+      COUNT(*) FILTER (WHERE status = 'new' AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today
     FROM leads

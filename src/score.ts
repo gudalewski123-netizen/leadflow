@@ -45,7 +45,7 @@ export const NOT_A_SITE =
  * man"). Always check BOTH name and handle — see isFranchise().
  */
 export const FRANCHISE_BRAND =
-  /\b(roto-?rooter|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting)\b/i;
+  /\b(roto-?rooter|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|augusta\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting)\b/i;
 
 /** Checks both the business name and the IG handle — a franchisee's display
  * name is sometimes rebranded generic ("WM Lawn Care") while the handle
@@ -66,6 +66,22 @@ export interface Profile {
 }
 
 const DAY = 86400;
+
+/**
+ * Instagram has never exposed account-creation date (no API, no scraper
+ * field, unlike X/Twitter's join date) — so "how old is this business" has
+ * to be inferred. Low post count alone is a false signal: an account that
+ * posted 8 times two years ago and went silent ALSO has a low count. The
+ * combination of few posts + still actively posting is what isolates a
+ * genuinely new, live business — and it's free, since both fields are
+ * already collected for every lead.
+ */
+export function isLikelyNewBusiness(p: Profile): boolean {
+  if (p.posts == null || p.posts > 15) return false;
+  if (!p.lastPost) return false;
+  const ageDays = (Date.now() / 1000 - p.lastPost) / DAY;
+  return ageDays <= 21;
+}
 
 export function scoreOf(p: Profile): { score: number; why: string[] } {
   const why: string[] = [];
@@ -104,6 +120,16 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
 
   // 6. Public contact = a second channel that isn't a DM.
   if (p.email) { s += 5; why.push("public email"); }
+
+  // 7. New & active business — few posts total, but posting recently. This is
+  // NOT just "low post count": a dead account that posted 8 times two years
+  // ago and stopped also has a low count. Requiring BOTH low posts and a
+  // recent lastPost is what actually isolates "just started, still going" —
+  // exactly who's most likely to be shopping for a first website right now,
+  // with zero legacy-site baggage. Threshold is deliberately generous (≤15
+  // posts, active in the last 3 weeks) since a brand-new account posting
+  // 2-3x/week hits 15 posts around the 5-7 week mark.
+  if (isLikelyNewBusiness(p)) { s += 15; why.push("NEW BUSINESS — few posts, active"); }
 
   const score = aggregator ? Math.min(s, 45) : Math.min(100, s);
   return { score, why };

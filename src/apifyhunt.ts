@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pool, init } from "./db.js";
 import { STATE_CITIES, ALL_STATES } from "./cities.js";
-import { scoreOf, type Profile } from "./score.js";
+import { scoreOf, isFranchise, type Profile } from "./score.js";
 
 const TARGET = Number(process.argv[2] ?? 5000);
 const NICHES = (process.argv[3] ??
@@ -229,7 +229,7 @@ async function runJob(j: { niche: string; city: string; state: string }) {
       const h = String(it.username ?? "").toLowerCase();
       if (!h || known.has(h)) continue;
       const full = String(it.fullName ?? h);
-      if (SKIP.test(full) || SKIP.test(h)) continue;
+      if (SKIP.test(full) || SKIP.test(h) || isFranchise(full, h)) continue;
       known.add(h); // shared across workers, so no two claim the same handle
 
       const p = toProfile(it);

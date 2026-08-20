@@ -25,6 +25,35 @@ export const LINK_AGGREGATOR =
 export const NOT_A_SITE =
   /facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
 
+/**
+ * National franchise brands — a local franchisee showing "no website" on
+ * Google/IG isn't a real prospect: they're locked into the franchisor's
+ * marketing program (a page on the corporate domain, a required ad budget),
+ * not shopping for an independent freelance site. Found via a name-repeats-
+ * across-dozens-of-cities audit on 2026-08-20 (Ace Handyman Services alone
+ * had 118 leads across 69 different metro areas — the signature of a
+ * franchise network, not small local businesses). These get excluded
+ * entirely at hunt time rather than just score-capped, since unlike a link-
+ * aggregator false positive, a franchise location is never a good lead
+ * regardless of what its bio link looks like.
+ *
+ * All internal spaces are `\s?` (not a literal space) so this matches
+ * equally well against a squashed IG handle ("weedman_bozeman") as it does
+ * a spaced display name ("Weed Man Bozeman") — some franchisees whitewash
+ * the display name entirely (found "WM Lawn Care" hiding Weed Man; that
+ * one's a distinct alias below since it shares no substring with "weed
+ * man"). Always check BOTH name and handle — see isFranchise().
+ */
+export const FRANCHISE_BRAND =
+  /\b(roto-?rooter|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting)\b/i;
+
+/** Checks both the business name and the IG handle — a franchisee's display
+ * name is sometimes rebranded generic ("WM Lawn Care") while the handle
+ * still gives away the real franchise ("weedman_bozeman"). */
+export function isFranchise(name: string | null | undefined, igHandle?: string | null): boolean {
+  return FRANCHISE_BRAND.test(name ?? "") || FRANCHISE_BRAND.test(igHandle ?? "");
+}
+
 export interface Profile {
   userId?: string | null;
   lastPost: number | null; // unix seconds

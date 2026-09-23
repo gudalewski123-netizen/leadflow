@@ -23,7 +23,28 @@ export const LINK_AGGREGATOR =
  * go.getjobber.com — 28k followers and no actual site.
  */
 export const NOT_A_SITE =
-  /facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
+  /facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site\/book|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
+
+/**
+ * Hosted SITE BUILDERS. These ARE real websites — a Google Sites page or a
+ * Square Online storefront is the business's actual web presence, however
+ * plain it looks. They were being caught by the NOT_A_SITE rules below
+ * (`google\.com` swallowed `sites.google.com`; `square\.site` swallowed the
+ * `name.square.site` storefronts) and scored as "no website", so the lead
+ * went out hot and got a DM asking whether they had a website — which they
+ * plainly did, right there in their bio. Audited 2026-09-23: 13 of 937 hot
+ * leads were in this state, 4 Google Sites and 9 Square storefronts.
+ *
+ * Matched BEFORE the two rules below, and worth no points: a business with
+ * a site builder page is not a no-website prospect.
+ *
+ * Note the leading dot on `\.square\.site` — it matches the storefront
+ * subdomain `pmrmobiledetailing.square.site` but deliberately NOT the
+ * booking link `square.site/book/...`, which is a scheduling page and still
+ * a genuine lead.
+ */
+export const SITE_BUILDER =
+  /sites\.google\.com|\.square\.site|wixsite\.com|\.weebly\.com|godaddysites\.com|\.myshopify\.com|\.wordpress\.com|business\.site|\.carrd\.co|\.webflow\.io/i;
 
 /**
  * National franchise brands — a local franchisee showing "no website" on
@@ -101,6 +122,10 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
   // 2. Bio link — the money signal.
   let aggregator = false;
   if (!p.externalUrl) { s += 30; why.push("NO link in bio"); }
+  /* Checked first, and scores nothing: a site-builder page IS their website.
+     This branch has to come before NOT_A_SITE, which is broad enough to
+     swallow several of these hosts. */
+  else if (SITE_BUILDER.test(p.externalUrl)) { why.push("has a website (site builder)"); }
   else if (LINK_AGGREGATOR.test(p.externalUrl)) { aggregator = true; why.push("link-in-bio page — may hide a real site"); }
   else if (NOT_A_SITE.test(p.externalUrl)) { s += 22; why.push("booking/social page only"); }
 

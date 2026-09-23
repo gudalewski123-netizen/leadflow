@@ -44,8 +44,17 @@ if (claudeAvailable) {
  * thread out of Instagram's Message Requests folder. The offer comes after
  * they answer.
  */
+/* "Couldn't find one linked on your page" was the second half of this line
+   and had to go. It asserts the lead has no website, and the scan it was
+   based on is frequently wrong — link-in-bio pages hide real sites, and until
+   2026-09-23 a Google Sites or Square storefront URL was misread as "no
+   website" outright. Opening by telling a business something false about
+   their own Instagram bio is the fastest way to lose the reply.
+
+   The question alone does the same job and cannot be wrong: if they have a
+   site they say so, and that is still a conversation. */
 const OPENER =
-  "Hey! Quick question — do you have a website for your business? Couldn't find one linked on your page.";
+  "Hey! Quick question — do you have a website for your business?";
 
 function template(_l: Lead): string {
   return OPENER;

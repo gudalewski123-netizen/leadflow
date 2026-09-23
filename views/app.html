@@ -51,6 +51,10 @@
   main { max-width: 1000px; margin: 18px auto 60px; padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; transition: border-color .15s, transform .15s; }
   .card:hover { border-color: var(--border-2); }
+  .stale { margin: 8px 0 2px; padding: 7px 10px; border-left: 3px solid #d9a441;
+           background: rgba(217,164,65,.08); border-radius: 0 6px 6px 0;
+           font-size: 12.5px; line-height: 1.5; color: #d9a441; }
+  .stale b { color: #f0c069; }
   .chead { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
   .name { font-weight: 700; font-size: 15px; letter-spacing: -0.2px; }
   .rating { color: var(--muted); font-size: 12.5px; font-weight: 500; }
@@ -214,6 +218,28 @@ window.showMore = async () => {
   loading = false; render();
 };
 
+/* hot_score is frozen at scan time and 40 of its 100 points are "posted
+   recently", measured against the clock on the day it was scored. It never
+   recalculates, so a card can insist a lead "posted this week" months later.
+   Rather than filter those out — which on 2026-09-23 would have cut the Hot
+   list from 937 to 99, all of them Google-Maps leads — the card states how
+   old the reading is and what the dates actually say, and lets you judge. */
+const daysSince = (d) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+function staleNote(l) {
+  const checked = daysSince(l.ig_checked_at);
+  const posted  = daysSince(l.last_active);
+  if (checked == null) return "";           // Google-Maps lead: score is review-based, it doesn't rot
+  if (checked < 14) return "";              // recent enough to trust as-is
+  const said = l.hot_why && /posted this week|posted <2wk/.test(l.hot_why);
+  const real = posted == null ? "unknown"
+    : posted < 7  ? `${posted}d ago`
+    : posted < 60 ? `${Math.round(posted / 7)}wk ago`
+    :               `${Math.round(posted / 30)}mo ago`;
+  return `<div class="stale">⏳ Instagram last checked ${checked} days ago${
+    said ? ` — the "${esc(l.hot_why.split(",")[0].trim())}" reason is that old too` : ""
+  }. Last post on record: <b>${real}</b>. Re-scan before trusting the score.</div>`;
+}
+
 function card(l) {
   const cat = l.category ? badge(l.category, ({no_site:"NO SITE",bad_site:`WEAK SITE ${l.site_score}`,ok_site:`OK SITE ${l.site_score}`})[l.category]) : "";
   const st = l.status !== "new" ? badge(l.status, l.status.toUpperCase()) : "";
@@ -228,6 +254,7 @@ function card(l) {
       ${l.maps_url ? ` · <a href="${esc(l.maps_url)}" target="_blank" rel="noopener">maps</a>` : ""}
       ${l.site_notes && l.category !== "no_site" ? ` · ${esc(l.site_notes)}` : ""}
     </div>
+    ${staleNote(l)}
     <div class="contact">
       ${l.ig_handle
         ? `<a class="pill ig" href="https://instagram.com/${esc(l.ig_handle)}" target="_blank" rel="noopener">📷 @${esc(l.ig_handle)}</a>`
@@ -250,6 +277,11 @@ function card(l) {
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function phoneDigits(p) { return String(p).replace(/[^\d+]/g, ""); }
 
+/* Any phrasing that tells the lead they have no website. Kept in one place
+   so the draft templates and this fallback cannot disagree about it. */
+const CLAIMS_NO_SITE =
+  /(don'?t|doesn'?t|do not|does not)\s+have\s+(a\s+)?(website|site|one)|could\s?n'?t\s+find|couldn't find|did\s?n'?t\s+(find|see)|not\s+see\s+(a\s+)?(website|site)|no\s+(website|site)\s+(linked|listed|found)|without\s+a\s+(website|site)/i;
+
 // One simple, friendly template so no lead is ever blank.
 function msgFor(l) {
   const name = l.name || "your business";
@@ -261,7 +293,14 @@ function msgFor(l) {
   // when Google Maps shows none — so NEVER tell them "you don't have a website."
   // Use a neutral pitch that works whether it's a first site or an upgrade.
   if (l.ig_handle) {
-    if (l.message && l.message.trim() && !/(don'?t|doesn'?t|do not|does not)\s+have\s+(a\s+)?(website|site|one)/i.test(l.message))
+    /* This guard exists so an IG lead is never told they have no website —
+       their bio usually has one even when Google Maps shows none. It only
+       matched explicit negations ("you don't have a website"), so the stored
+       opener "Couldn't find one linked on your page" walked straight through
+       it: on 2026-09-23 all 45 IG hot leads carrying a stored message were
+       asserting no-website, and all 45 slipped past. Now it also catches the
+       "couldn't find / didn't see / no website" family. */
+    if (l.message && l.message.trim() && !CLAIMS_NO_SITE.test(l.message))
       return l.message;
     return `Hey! I design clean, modern websites for local ${l.niche ?? "businesses"} and came across ${name}. I'd love to put together a free mockup showing what a polished site could look like for you — whether it's a first site or an upgrade. No pressure at all, just thought it might be useful!`;
   }

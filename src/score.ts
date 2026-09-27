@@ -68,11 +68,19 @@ export const SITE_BUILDER =
 export const FRANCHISE_BRAND =
   /\b(roto-?rooter|honest\s?abe\s?roofing|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|augusta\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting|painting\s?with\s?a\s?twist|sam\s?the\s?concrete\s?man|360\s?painting|lime\s?painting|fire\s?dawgs|mighty\s?dog\s?roofing|paint\s?ez|groovy\s?hues|bumble\s?roofing|stand\s?strong\s?fencing|superior\s?fence(\s?(and|&)\s?rail)?|my\s?handyman|hargrove\s?roofing|mgm\s?fence)\b/i;
 
+/* An IG handle glues the brand to the city — "jdogconcordnc",
+   "mgmfencecompanygreenville" — so \b never fires after the brand and a
+   franchise walks straight through. Anchored at the START of the stripped
+   handle: unanchored would match "orkin" inside "hardworkin". */
+const FRANCHISE_HANDLE = new RegExp("^(?:roto-?rooter|honest\\s?abe\\s?roofing|mr\\.?\\s?handyman|certapro(\\s?painters)?|ace\\s?handyman(\\s?services)?|mr\\.?\\s?rooter|serv\\s?pro|trugreen|weed\\s?man|wm\\s?lawn\\s?care|augusta\\s?lawn\\s?care|mister\\s?sparky|merry\\s?maids|lawn\\s?doctor|aire\\s?serv|benjamin\\s?franklin\\s?plumbing|molly\\s?maid|stanley\\s?steemer|handyman\\s?connection|orkin|servicemaster|u\\.?s\\.?\\s?lawns|two\\s?maids|the\\s?grounds\\s?guys|one\\s?hour\\s?heating(\\s?(and|&)\\s?air)?|american\\s?leak\\s?detection|fresh\\s?coat(\\s?painters)?|chem-?dry|junk\\s?king|window\\s?genie|anago|puroclean|jdog(\\s?junk\\s?removal)?|terminix|precision\\s?(garage\\s?)?door|senske|bath\\s?fitter|rainbow\\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\\s?men\\s?and\\s?a\\s?truck|belfor|restoration\\s?1|mosquito\\s?joe|college\\s?hunks|kitchen\\s?tune-?up|win\\s?home\\s?inspection|bin\\s?there\\s?dump\\s?that|mosquito\\s?squad|dryer\\s?vent\\s?wizard|scotts\\s?lawn(\\s?service)?|amerispec|wallaby\\s?windows|screenmobile|college\\s?pro\\s?painters|bath\\s?planet|shelf\\s?genie|budget\\s?blinds|christmas\\s?decor|glass\\s?doctor|real\\s?property\\s?management|1-?800-?water\\s?damage|dream\\s?maker\\s?bath|30\\s?minute\\s?cleaners|pillar\\s?to\\s?post|housemaster|five\\s?star\\s?painting|painting\\s?with\\s?a\\s?twist|sam\\s?the\\s?concrete\\s?man|360\\s?painting|lime\\s?painting|fire\\s?dawgs|mighty\\s?dog\\s?roofing|paint\\s?ez|groovy\\s?hues|bumble\\s?roofing|stand\\s?strong\\s?fencing|superior\\s?fence(\\s?(and|&)\\s?rail)?|my\\s?handyman|hargrove\\s?roofing|mgm\\s?fence)", "i");
+
+
 /** Checks both the business name and the IG handle — a franchisee's display
  * name is sometimes rebranded generic ("WM Lawn Care") while the handle
  * still gives away the real franchise ("weedman_bozeman"). */
 export function isFranchise(name: string | null | undefined, igHandle?: string | null): boolean {
-  return FRANCHISE_BRAND.test(name ?? "") || FRANCHISE_BRAND.test(igHandle ?? "");
+  if (FRANCHISE_BRAND.test(name ?? "") || FRANCHISE_BRAND.test(igHandle ?? "")) return true;
+  return FRANCHISE_HANDLE.test((igHandle ?? "").replace(/[^a-z0-9]/gi, ""));
 }
 
 export interface Profile {

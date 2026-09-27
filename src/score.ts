@@ -66,7 +66,7 @@ export const SITE_BUILDER =
  * man"). Always check BOTH name and handle — see isFranchise().
  */
 export const FRANCHISE_BRAND =
-  /\b(roto-?rooter|honest\s?abe\s?roofing|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|augusta\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting)\b/i;
+  /\b(roto-?rooter|honest\s?abe\s?roofing|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|augusta\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting|painting\s?with\s?a\s?twist|sam\s?the\s?concrete\s?man|360\s?painting|lime\s?painting|fire\s?dawgs|mighty\s?dog\s?roofing|paint\s?ez|groovy\s?hues|bumble\s?roofing|stand\s?strong\s?fencing|superior\s?fence(\s?(and|&)\s?rail)?|my\s?handyman|hargrove\s?roofing|mgm\s?fence)\b/i;
 
 /** Checks both the business name and the IG handle — a franchisee's display
  * name is sometimes rebranded generic ("WM Lawn Care") while the handle
@@ -156,6 +156,17 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
   // 2-3x/week hits 15 posts around the 5-7 week mark.
   if (isLikelyNewBusiness(p)) { s += 15; why.push("NEW BUSINESS — few posts, active"); }
 
-  const score = aggregator ? Math.min(s, 45) : Math.min(100, s);
+  /* A hard ceiling, not just a withheld bonus. The follower rule above says
+     in its own comment that >50k means "a chain, brand, public figure or
+     org" — but it only declined to ADD 10 points, so those accounts still
+     cleared the hot threshold on recency alone. The actor Paul Wesley
+     (13.6M followers) sat in the Hot list as a Saint Paul concrete
+     contractor scoring 75. Capped below 60 so it can never be hot again,
+     while staying visible in the full list. */
+  const tooBig = (p.followers ?? 0) > 50000;
+  if (tooBig) why.push("too big to be a local business");
+
+  let score = aggregator ? Math.min(s, 45) : Math.min(100, s);
+  if (tooBig) score = Math.min(score, 45);
   return { score, why };
 }

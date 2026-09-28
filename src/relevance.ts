@@ -40,6 +40,12 @@ export const NICHE_WORDS: Record<string, string[]> = {
   "hvac":             ["hvac","heat","cool","air","furnace","climate","refriger","comfort","mechanical"],
   "moving company":   ["mov","relocat","haul","transport","pack","freight"],
   "pool service":     ["pool","spa","aqua","water","swim","chlorine"],
+  "hair salon":       ["hair","salon","stylist","style","cut","colour","color","blow","barb","beauty","studio","lounge","locs","braid","extension","balayage"],
+  "barbershop":       ["barb","cut","fade","shave","grooming","gents","men","clipper","shop","chair","blend","taper"],
+  "nail salon":       ["nail","mani","pedi","polish","lacquer","acrylic","gel","spa","beauty","claw","tip"],
+  "lash and brow":    ["lash","brow","extension","beauty","aesthet","esthet","studio","wax","threading","tint","microblad","pmu"],
+  "med spa":          ["spa","aesthet","esthet","skin","facial","derm","beauty","glow","botox","filler","laser","rejuven","wellness"],
+  "massage therapy":  ["massage","therap","bodywork","spa","relax","wellness","deep","tissue","sports","myo"],
 };
 
 /**
@@ -76,10 +82,22 @@ const OTHER_INDUSTRY = new Set(
    "realty realtor salon barber tattoo fitness gym yoga restaurant cafe bakery boutique apparel " +
    "clothing jewelry jewellery nails lash").split(" ")
 );
-export function isOtherIndustry(name?: string | null, handle?: string | null): boolean {
+export function isOtherIndustry(
+  name?: string | null,
+  handle?: string | null,
+  niche?: string | null
+): boolean {
+  /* A word is only "another industry" if it isn't one of THIS niche's own words.
+     Without this, searching "hair salon" rejects every salon: "salon", "barber",
+     "nails", "lash" and "spa" all sit in the other-industry list because they
+     were junk when we were hunting concrete contractors. */
+  const own = new Set(NICHE_WORDS[niche ?? ""] ?? []);
   const toks = `${name ?? ""} ${handle ?? ""}`.toLowerCase().split(/[^a-z]+/).filter(Boolean);
-  if (toks.some((w) => OTHER_INDUSTRY.has(w))) return true;
-  return toks.some((w) => w.length > 5 && (w.endsWith("art") || w.endsWith("arts") || w.endsWith("studio")));
+  if (toks.some((w) => OTHER_INDUSTRY.has(w) && !own.has(w))) return true;
+  /* the glued-on suffix check ("lakesandlightsart") must respect the niche too —
+     "studio" is an art tell for a painting search and a normal word for a lash bar */
+  const sfx = ["art", "arts", "studio"].filter((x) => !own.has(x));
+  return toks.some((w) => w.length > 5 && sfx.some((x) => w.endsWith(x)));
 }
 
 export function isRelevant(
@@ -88,7 +106,7 @@ export function isRelevant(
   handle?: string | null,
   bio?: string | null
 ): boolean {
-  if (isOtherIndustry(name, handle)) return false;   // a gallery is never a painting contractor
+  if (isOtherIndustry(name, handle, niche)) return false;   // a gallery is never a painting contractor
   const hay = `${name ?? ""} ${handle ?? ""} ${bio ?? ""}`.toLowerCase();
   const words = NICHE_WORDS[niche] ?? niche.toLowerCase().split(/\s+/);
   if (words.some((w) => hay.includes(w))) return true;
@@ -115,5 +133,11 @@ export const SEARCH_TERM: Record<string, string> = {
   "fencing": "fence company",
   "moving company": "moving company",
   "pool service": "pool service company",
+  "hair salon": "hair salon",
+  "barbershop": "barber shop",
+  "nail salon": "nail salon",
+  "lash and brow": "lash studio",
+  "med spa": "med spa",
+  "massage therapy": "massage therapy",
 };
 export const searchTermFor = (niche: string) => SEARCH_TERM[niche] ?? niche;

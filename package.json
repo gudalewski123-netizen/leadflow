@@ -19,7 +19,8 @@
     "handlelist": "tsx src/handlelist.ts",
     "dash": "tsx src/dash.ts",
     "start": "tsx src/dash.ts",
-    "handles": "tsx src/handles.ts"
+    "handles": "tsx src/handles.ts",
+    "maps": "tsx src/mapshunt.ts"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

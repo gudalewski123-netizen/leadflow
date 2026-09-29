@@ -21,6 +21,7 @@ import path from "node:path";
 import { pool, init } from "./db.js";
 import { STATE_CITIES, ALL_STATES } from "./cities.js";
 import { scoreOf, isFranchise, type Profile } from "./score.js";
+import { isRelevant, searchTermFor, MAX_FOLLOWERS } from "./relevance.js";
 
 const TARGET = Number(process.argv[2] ?? 5000);
 const NICHES = (process.argv[3] ??
@@ -164,6 +165,8 @@ for (const niche of NICHES)
     for (const city of (STATE_CITIES[st] ?? []).slice(0, 3)) jobs.push({ niche, city, state: st });
 
 let added = 0, hot = 0, queries = 0;
+// Rejections, reported at the end so a bad filter shows up as a number.
+let rejBig = 0, rejIrrelevant = 0;
 
 // Each Apify run spins up its own container (~2-3 min), so serial execution
 // would take ~18h for a 5k target. Runs are independent, so pull jobs from a
@@ -217,7 +220,7 @@ async function worker() {
 
 async function runJob(j: { niche: string; city: string; state: string }) {
   {
-    const items = await hunt(`${j.niche} ${j.city}`);
+    const items = await hunt(`${searchTermFor(j.niche)} ${j.city}`);
     queries++;
     // A failed run must NOT be recorded as swept, or that city is skipped for
     // HUNT_REFRESH_DAYS despite never having been searched.
@@ -230,6 +233,16 @@ async function runJob(j: { niche: string; city: string; state: string }) {
       if (!h || known.has(h)) continue;
       const full = String(it.fullName ?? h);
       if (SKIP.test(full) || SKIP.test(h) || isFranchise(full, h)) continue;
+
+      /* Instagram's user search matches any token in the query, so the city
+         name alone pulls in strangers — "Des Moines" returned Desi Lydic and
+         Olivier Desmedt, "Saint Paul" returned the actor Paul Wesley. Reject
+         anything that shows no sign of being in the trade, and anything too
+         big to be a local business. See src/relevance.ts. */
+      const bio = String(it.biography ?? "");
+      if ((it.followersCount ?? 0) > MAX_FOLLOWERS) { rejBig++; continue; }
+      if (!isRelevant(j.niche, full, h, bio)) { rejIrrelevant++; continue; }
+
       known.add(h); // shared across workers, so no two claim the same handle
 
       const p = toProfile(it);
@@ -270,6 +283,7 @@ await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 await checkSpend();
 const used = spend - startSpend;
 console.log(`\nDone${stoppedForBudget ? " (stopped at spend ceiling)" : ""}. ${added} new leads from ${queries} queries, ${hot} HOT (>=60).`);
+console.log(`Rejected before insert: ${rejIrrelevant} with no sign of the trade, ${rejBig} over ${MAX_FOLLOWERS.toLocaleString()} followers.`);
 console.log(`Apify: $${used.toFixed(2)} this run ($${spend.toFixed(2)} total)${added ? `, $${(used / added).toFixed(4)}/lead` : ""}.`);
 console.log(`Export:  npm run handlelist -- hot`);
 await pool.end();

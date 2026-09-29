@@ -5,3 +5,4 @@ leadflow.db*
 .DS_Store
 logs/
 .ig_cookies.json
+check.mjs

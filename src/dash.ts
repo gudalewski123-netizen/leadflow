@@ -108,8 +108,23 @@ app.get("/api/leads", async (req, res) => {
   else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
   // No AEO: has a website but no schema.org structured data — pitch AI-search visibility
   else if (status === "no_aeo") conds.push("status='new'", "website IS NOT NULL", "has_aeo = false");
-  // Hot: scored by src/hot.ts from live Instagram data — recently posting AND
-  // no real website in bio. The best prospects we can identify.
+  /* Hot: scored by src/hot.ts from live Instagram data — recently posting AND
+     no real website in bio. The best prospects we can identify.
+
+     NOT filtered on last_active, deliberately. hot_score is computed once, at
+     scan time, and 40 of its 100 points are "how recently did they post",
+     measured against the clock on the day it was scored — so the number rots
+     and is never recalculated. On 2026-09-23, 579 of 937 hot leads still read
+     "posted this week" while every one had last posted over a month earlier;
+     the IG data had not been refreshed since 17-20 August.
+
+     The obvious fix — require last_active within 30 days — was tried and
+     reverted: it cut the list from 937 to 99 and every survivor was a
+     Google-Maps lead with no Instagram at all. That clause does not measure
+     whether the business went quiet, it measures whether WE have looked
+     lately, and silently binning 838 prospects over our own stale scrape is
+     worse than showing them. The card shows how old the reading is instead —
+     see the stale badge in views/app.html — so the operator can judge it. */
   else if (status === "hot") conds.push("status='new'", "hot_score >= 60");
   // New: few posts but posting recently — see isLikelyNewBusiness() in
   // score.ts. Tagged into hot_why at scoring time.

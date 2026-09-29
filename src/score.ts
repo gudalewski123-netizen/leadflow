@@ -23,7 +23,28 @@ export const LINK_AGGREGATOR =
  * go.getjobber.com — 28k followers and no actual site.
  */
 export const NOT_A_SITE =
-  /facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
+  /facebook\.com|instagram\.com|m\.me|wa\.me|booksy|vagaro|fresha|square\.site\/book|squareup|calendly|yelp\.com|google\.com|g\.page|getjobber|jobber\.com|housecallpro|thumbtack|angi\.com|porch\.com|nextdoor/i;
+
+/**
+ * Hosted SITE BUILDERS. These ARE real websites — a Google Sites page or a
+ * Square Online storefront is the business's actual web presence, however
+ * plain it looks. They were being caught by the NOT_A_SITE rules below
+ * (`google\.com` swallowed `sites.google.com`; `square\.site` swallowed the
+ * `name.square.site` storefronts) and scored as "no website", so the lead
+ * went out hot and got a DM asking whether they had a website — which they
+ * plainly did, right there in their bio. Audited 2026-09-23: 13 of 937 hot
+ * leads were in this state, 4 Google Sites and 9 Square storefronts.
+ *
+ * Matched BEFORE the two rules below, and worth no points: a business with
+ * a site builder page is not a no-website prospect.
+ *
+ * Note the leading dot on `\.square\.site` — it matches the storefront
+ * subdomain `pmrmobiledetailing.square.site` but deliberately NOT the
+ * booking link `square.site/book/...`, which is a scheduling page and still
+ * a genuine lead.
+ */
+export const SITE_BUILDER =
+  /sites\.google\.com|\.square\.site|wixsite\.com|\.weebly\.com|godaddysites\.com|\.myshopify\.com|\.wordpress\.com|business\.site|\.carrd\.co|\.webflow\.io/i;
 
 /**
  * National franchise brands — a local franchisee showing "no website" on
@@ -45,13 +66,21 @@ export const NOT_A_SITE =
  * man"). Always check BOTH name and handle — see isFranchise().
  */
 export const FRANCHISE_BRAND =
-  /\b(roto-?rooter|honest\s?abe\s?roofing|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|augusta\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting)\b/i;
+  /\b(roto-?rooter|honest\s?abe\s?roofing|mr\.?\s?handyman|certapro(\s?painters)?|ace\s?handyman(\s?services)?|mr\.?\s?rooter|serv\s?pro|trugreen|weed\s?man|wm\s?lawn\s?care|augusta\s?lawn\s?care|mister\s?sparky|merry\s?maids|lawn\s?doctor|aire\s?serv|benjamin\s?franklin\s?plumbing|molly\s?maid|stanley\s?steemer|handyman\s?connection|orkin|servicemaster|u\.?s\.?\s?lawns|two\s?maids|the\s?grounds\s?guys|one\s?hour\s?heating(\s?(and|&)\s?air)?|american\s?leak\s?detection|fresh\s?coat(\s?painters)?|chem-?dry|junk\s?king|window\s?genie|anago|puroclean|jdog(\s?junk\s?removal)?|terminix|precision\s?(garage\s?)?door|senske|bath\s?fitter|rainbow\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\s?men\s?and\s?a\s?truck|belfor|restoration\s?1|mosquito\s?joe|college\s?hunks|kitchen\s?tune-?up|win\s?home\s?inspection|bin\s?there\s?dump\s?that|mosquito\s?squad|dryer\s?vent\s?wizard|scotts\s?lawn(\s?service)?|amerispec|wallaby\s?windows|screenmobile|college\s?pro\s?painters|bath\s?planet|shelf\s?genie|budget\s?blinds|christmas\s?decor|glass\s?doctor|real\s?property\s?management|1-?800-?water\s?damage|dream\s?maker\s?bath|30\s?minute\s?cleaners|pillar\s?to\s?post|housemaster|five\s?star\s?painting|painting\s?with\s?a\s?twist|sam\s?the\s?concrete\s?man|360\s?painting|lime\s?painting|fire\s?dawgs|mighty\s?dog\s?roofing|paint\s?ez|groovy\s?hues|bumble\s?roofing|stand\s?strong\s?fencing|superior\s?fence(\s?(and|&)\s?rail)?|my\s?handyman|hargrove\s?roofing|mgm\s?fence)\b/i;
+
+/* An IG handle glues the brand to the city — "jdogconcordnc",
+   "mgmfencecompanygreenville" — so \b never fires after the brand and a
+   franchise walks straight through. Anchored at the START of the stripped
+   handle: unanchored would match "orkin" inside "hardworkin". */
+const FRANCHISE_HANDLE = new RegExp("^(?:roto-?rooter|honest\\s?abe\\s?roofing|mr\\.?\\s?handyman|certapro(\\s?painters)?|ace\\s?handyman(\\s?services)?|mr\\.?\\s?rooter|serv\\s?pro|trugreen|weed\\s?man|wm\\s?lawn\\s?care|augusta\\s?lawn\\s?care|mister\\s?sparky|merry\\s?maids|lawn\\s?doctor|aire\\s?serv|benjamin\\s?franklin\\s?plumbing|molly\\s?maid|stanley\\s?steemer|handyman\\s?connection|orkin|servicemaster|u\\.?s\\.?\\s?lawns|two\\s?maids|the\\s?grounds\\s?guys|one\\s?hour\\s?heating(\\s?(and|&)\\s?air)?|american\\s?leak\\s?detection|fresh\\s?coat(\\s?painters)?|chem-?dry|junk\\s?king|window\\s?genie|anago|puroclean|jdog(\\s?junk\\s?removal)?|terminix|precision\\s?(garage\\s?)?door|senske|bath\\s?fitter|rainbow\\s?(restoration|international)|1-?800-?got-?junk|n-?hance|re-?bath|two\\s?men\\s?and\\s?a\\s?truck|belfor|restoration\\s?1|mosquito\\s?joe|college\\s?hunks|kitchen\\s?tune-?up|win\\s?home\\s?inspection|bin\\s?there\\s?dump\\s?that|mosquito\\s?squad|dryer\\s?vent\\s?wizard|scotts\\s?lawn(\\s?service)?|amerispec|wallaby\\s?windows|screenmobile|college\\s?pro\\s?painters|bath\\s?planet|shelf\\s?genie|budget\\s?blinds|christmas\\s?decor|glass\\s?doctor|real\\s?property\\s?management|1-?800-?water\\s?damage|dream\\s?maker\\s?bath|30\\s?minute\\s?cleaners|pillar\\s?to\\s?post|housemaster|five\\s?star\\s?painting|painting\\s?with\\s?a\\s?twist|sam\\s?the\\s?concrete\\s?man|360\\s?painting|lime\\s?painting|fire\\s?dawgs|mighty\\s?dog\\s?roofing|paint\\s?ez|groovy\\s?hues|bumble\\s?roofing|stand\\s?strong\\s?fencing|superior\\s?fence(\\s?(and|&)\\s?rail)?|my\\s?handyman|hargrove\\s?roofing|mgm\\s?fence)", "i");
+
 
 /** Checks both the business name and the IG handle — a franchisee's display
  * name is sometimes rebranded generic ("WM Lawn Care") while the handle
  * still gives away the real franchise ("weedman_bozeman"). */
 export function isFranchise(name: string | null | undefined, igHandle?: string | null): boolean {
-  return FRANCHISE_BRAND.test(name ?? "") || FRANCHISE_BRAND.test(igHandle ?? "");
+  if (FRANCHISE_BRAND.test(name ?? "") || FRANCHISE_BRAND.test(igHandle ?? "")) return true;
+  return FRANCHISE_HANDLE.test((igHandle ?? "").replace(/[^a-z0-9]/gi, ""));
 }
 
 export interface Profile {
@@ -101,6 +130,10 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
   // 2. Bio link — the money signal.
   let aggregator = false;
   if (!p.externalUrl) { s += 30; why.push("NO link in bio"); }
+  /* Checked first, and scores nothing: a site-builder page IS their website.
+     This branch has to come before NOT_A_SITE, which is broad enough to
+     swallow several of these hosts. */
+  else if (SITE_BUILDER.test(p.externalUrl)) { why.push("has a website (site builder)"); }
   else if (LINK_AGGREGATOR.test(p.externalUrl)) { aggregator = true; why.push("link-in-bio page — may hide a real site"); }
   else if (NOT_A_SITE.test(p.externalUrl)) { s += 22; why.push("booking/social page only"); }
 
@@ -131,6 +164,17 @@ export function scoreOf(p: Profile): { score: number; why: string[] } {
   // 2-3x/week hits 15 posts around the 5-7 week mark.
   if (isLikelyNewBusiness(p)) { s += 15; why.push("NEW BUSINESS — few posts, active"); }
 
-  const score = aggregator ? Math.min(s, 45) : Math.min(100, s);
+  /* A hard ceiling, not just a withheld bonus. The follower rule above says
+     in its own comment that >50k means "a chain, brand, public figure or
+     org" — but it only declined to ADD 10 points, so those accounts still
+     cleared the hot threshold on recency alone. The actor Paul Wesley
+     (13.6M followers) sat in the Hot list as a Saint Paul concrete
+     contractor scoring 75. Capped below 60 so it can never be hot again,
+     while staying visible in the full list. */
+  const tooBig = (p.followers ?? 0) > 50000;
+  if (tooBig) why.push("too big to be a local business");
+
+  let score = aggregator ? Math.min(s, 45) : Math.min(100, s);
+  if (tooBig) score = Math.min(score, 45);
   return { score, why };
 }

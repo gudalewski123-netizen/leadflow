@@ -4,11 +4,11 @@
  * Runs all the time under launchd (com.gregg.leadflow.dmagent). Every 10s it
  * checks in (so the dashboard can show "Mac online"), reads dm_control, and:
  *
- *   Connect Instagram  → opens the bot's own Chrome window on the Instagram
- *                        login page; Gregg logs in by hand; the moment the
- *                        session cookie appears it reads the username and
- *                        closes the window itself. Passwords never pass
- *                        through here — only the browser profile keeps the login.
+ *   Connect Instagram  → the dashboard opens instagram.com in a new tab of
+ *                        Gregg's own Chrome; he logs in there by hand. The
+ *                        helper picks the session up from Chrome's cookie
+ *                        store, copies it into the bot's profile and reads the
+ *                        username. Passwords never pass through here.
  *   Start sending      → runs src/dmbot.ts (live) whenever we're inside
  *                        9am–8pm Eastern and today's cap isn't used up.
  *                        Re-runs it next morning without being asked again.
@@ -23,12 +23,13 @@
  * Never sends anything on its own initiative: desired starts 'stopped'.
  */
 import { chromium } from "playwright";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync, writeFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pool, init } from "./db.js";
 import { budget, hourInTZ } from "./dmcap.js";
+import { readInstagramSession, type IgSession } from "./chromecookies.js";
 
 const ROOT = join(homedir(), "leadflow");
 const PROFILE = join(ROOT, ".ig-profile");
@@ -60,42 +61,80 @@ async function setStatus(status: string, detail: string | null = null, extra: Re
   );
 }
 
-/* ---------- Connect Instagram ---------- */
-async function connect() {
-  busyConnecting = true;
-  if (child) { log("connect: stopping the running sender first"); child.kill("SIGINT"); await sleep(4000); }
-  await setStatus("connecting", "A Chrome window opened on the Mac — log in to Instagram there.");
-  const opts = { headless: process.env.DM_HEADLESS === "1", viewport: { width: 1100, height: 820 }, args: ["--disable-blink-features=AutomationControlled"] };
-  const ctx = await chromium.launchPersistentContext(PROFILE, { ...opts, channel: "chrome" })
+/* ---------- Connect Instagram ----------
+   The dashboard opens instagram.com in a new tab of Gregg's own browser; he
+   logs in there. We watch that browser's cookie store, and once an Instagram
+   session shows up we copy it into the bot's profile and check it works. */
+async function launchBot(headless: boolean, userAgent?: string) {
+  const opts = { headless, userAgent, viewport: { width: 1100, height: 820 }, args: ["--disable-blink-features=AutomationControlled"] };
+  return chromium.launchPersistentContext(PROFILE, { ...opts, channel: "chrome" })
     .catch(() => chromium.launchPersistentContext(PROFILE, opts));
-  try {
-    const page = ctx.pages()[0] ?? (await ctx.newPage());
-    await page.goto("https://www.instagram.com/accounts/login/", { waitUntil: "domcontentloaded" }).catch(() => {});
-    const deadline = Date.now() + Number(process.env.DM_LOGIN_TIMEOUT_MS ?? 10 * 60_000);
-    let ok = false;
-    while (Date.now() < deadline) {
-      if ((await ctx.cookies("https://www.instagram.com")).some((c) => c.name === "sessionid" && c.value)) { ok = true; break; }
-      if (ctx.pages().length === 0) break; // window closed by hand
-      await sleep(2000);
-    }
-    if (!ok) { await setStatus("not connected", "Login window closed or timed out before the login finished."); return; }
+}
 
-    await sleep(3000); // let Instagram finish its post-login redirects
-    let account: string | null = null;
-    try {
-      const uid = (await ctx.cookies("https://www.instagram.com")).find((c) => c.name === "ds_user_id")?.value;
-      if (uid) {
-        account = await page.evaluate(async (id) => {
-          const r = await fetch(`/api/v1/users/${id}/info/`, { headers: { "x-ig-app-id": "936619743392459" } });
-          return r.ok ? (await r.json())?.user?.username ?? null : null;
-        }, uid);
-      }
-    } catch {}
-    if (existsSync(STOP) && /not logged in/i.test(readFileSync(STOP, "utf8"))) unlinkSync(STOP); // that STOP is now resolved
-    await setStatus("connected", account ? `Logged in as @${account}.` : "Logged in.", { account: account ?? "(logged in)" });
-    log(`connected${account ? " as @" + account : ""}`);
+/** The installed Chrome's real user-agent (headless Chrome otherwise says "HeadlessChrome"). */
+function chromeUA(): string {
+  let v = "141.0.0.0";
+  try { v = execFileSync("/usr/bin/defaults", ["read", "/Applications/Google Chrome.app/Contents/Info", "CFBundleShortVersionString"], { encoding: "utf8" }).trim(); } catch {}
+  return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${v.split(".")[0]}.0.0.0 Safari/537.36`;
+}
+
+/** Copy a browser session into the bot's profile, then load Instagram there as a
+    normal Chrome (real user-agent — never "HeadlessChrome") and read who it is.
+    Returns the username, "(logged in)" if the name couldn't be read but the
+    session holds, or null if Instagram threw the session out. */
+async function adopt(s: IgSession): Promise<string | null> {
+  const ctx = await launchBot(true, chromeUA());
+  try {
+    await ctx.clearCookies();
+    await ctx.addCookies(s.cookies.map((c) => ({ ...c, sameSite: c.sameSite === "None" && !c.secure ? "Lax" as const : c.sameSite })));
+    const page = ctx.pages()[0] ?? (await ctx.newPage());
+    await page.goto("https://www.instagram.com/accounts/edit/", { waitUntil: "domcontentloaded", timeout: 45_000 }).catch(() => {});
+    if (/\/accounts\/login|\/challenge/.test(page.url())) { log(`session check: sent to ${new URL(page.url()).pathname}`); return null; }
+    // The sidebar's own-profile link is the one plain /<name>/ link that isn't a nav page.
+    const NAV = new Set(["reels", "explore", "popular", "direct", "accounts", "stories", "notifications", "create"]);
+    let user: string | null = null;
+    for (let i = 0; i < 10 && !user; i++) {
+      await sleep(1500);
+      const hrefs = await page.$$eval('a[href^="/"]', (as) => as.map((a) => a.getAttribute("href") || "")).catch(() => [] as string[]);
+      user = hrefs.map((h) => h.match(/^\/([A-Za-z0-9._]+)\/$/)?.[1]).find((n) => n && !NAV.has(n)) ?? null;
+    }
+    const alive = (await ctx.cookies("https://www.instagram.com")).some((c) => c.name === "sessionid" && c.value);
+    return alive ? (user || "(logged in)") : null;
   } finally {
     await ctx.close().catch(() => {});
+  }
+}
+
+async function connect() {
+  busyConnecting = true;
+  try {
+    if (child) { log("connect: stopping the running sender first"); child.kill("SIGINT"); await sleep(4000); }
+    await setStatus("connecting", "Log in to Instagram in the Chrome tab that just opened. It connects by itself once you're in.");
+    const deadline = Date.now() + Number(process.env.DM_LOGIN_TIMEOUT_MS ?? 10 * 60_000);
+    const rejected = new Set<string>();
+    while (Date.now() < deadline) {
+      let s: IgSession | null = null;
+      try { s = readInstagramSession(); }
+      catch (e: any) {
+        log("cookie read failed:", e?.message);
+        await setStatus("not connected", "Couldn't read Chrome's Instagram login. If the Mac showed a keychain prompt, click Always Allow, then Connect again.");
+        return;
+      }
+      const sid = s?.cookies.find((c) => c.name === "sessionid")?.value;
+      if (s && sid && !rejected.has(sid)) {
+        const account = await adopt(s);
+        if (account) {
+          if (existsSync(STOP) && /not logged in/i.test(readFileSync(STOP, "utf8"))) unlinkSync(STOP); // that STOP is now resolved
+          await setStatus("connected", `Logged in as @${account} (from ${s.browser}).`, { account });
+          log(`connected as @${account} via ${s.browser} ${s.profile}`);
+          return;
+        }
+        rejected.add(sid); // Instagram refused it — wait for a fresh login
+      }
+      await sleep(3000); // Chrome writes new cookies to disk within ~30s
+    }
+    await setStatus("not connected", "Didn't see an Instagram login in Chrome on this Mac. Log in at instagram.com in Chrome, then click Connect again.");
+  } finally {
     busyConnecting = false;
   }
 }

@@ -638,10 +638,14 @@ load();
     $("dm-connect").disabled = d.status === "connecting";
     $("dm-connect").textContent = d.account ? "Reconnect Instagram" : "Connect Instagram";
   }
-  $("dm-connect").onclick = async () => {
+  /* Opens Instagram in a new tab of THIS browser (must happen synchronously in
+     the click or the popup blocker eats it); the Mac helper then picks the
+     login up from Chrome. */
+  $("dm-connect").onclick = () => {
     if (last && !last.macOnline) return alert("Your Mac's LeadFlow helper is offline. Make sure the Mac is on and awake, then try again.");
-    await post("/api/dm/connect"); refresh();
-    alert("A Chrome window is opening on your Mac. Log in to the Instagram account to send from — the window closes by itself when you're in.");
+    if (/iPhone|iPad|Android/i.test(navigator.userAgent)) return alert("Connect from Chrome on your Mac — that's where the sender runs.");
+    window.open("https://www.instagram.com/", "_blank");
+    post("/api/dm/connect").then(refresh);
   };
   $("dm-start").onclick = async () => {
     const r = await post("/api/dm/start");

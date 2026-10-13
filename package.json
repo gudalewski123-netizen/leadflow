@@ -20,7 +20,8 @@
     "dash": "tsx src/dash.ts",
     "start": "tsx src/dash.ts",
     "handles": "tsx src/handles.ts",
-    "maps": "tsx src/mapshunt.ts"
+    "maps": "tsx src/mapshunt.ts",
+    "dmbot": "tsx src/dmbot.ts"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

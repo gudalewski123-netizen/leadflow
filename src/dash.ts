@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
+import { openerFor, variantTag } from "./variants.js";
+import { budget as dmBudget } from "./dmcap.js";
 import { findIgHandle } from "./findig.js";
 import { ALL_STATES } from "./cities.js";
 
@@ -157,6 +159,12 @@ app.get("/api/leads", async (req, res) => {
     `SELECT * FROM leads ${where} ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
     params
   )).rows;
+  /* Attach the varied opener here rather than storing it. Writing a variant
+     onto 157k rows is the bulk UPDATE this pipeline exists to avoid, and the
+     choice is deterministic from (id, touches) anyway — so it is free to
+     compute and always consistent with what the follow-up logic will pick
+     next. `message` still wins when it holds a real hand-written draft. */
+  for (const r of rows) r.opener = openerFor(r.id, r.touches ?? 0);
   res.json({ leads: rows, total });
 });
 
@@ -215,9 +223,13 @@ app.post("/api/leads/:id", async (req, res) => {
         RETURNING touches`,
         [id]
       );
+      const touchNo = r.rows[0]?.touches ?? 1;
+      /* Log the variant tag. Without it there is no way to tell a message that
+         gets no replies from a channel that gets no replies, and the opener is
+         the one input we control. */
       await pool.query(
-        "INSERT INTO outreach (lead_id, channel, touch_no) VALUES ($1,$2,$3)",
-        [id, (req.body as any).channel ?? "ig", r.rows[0]?.touches ?? 1]
+        "INSERT INTO outreach (lead_id, channel, touch_no, note) VALUES ($1,$2,$3,$4)",
+        [id, (req.body as any).channel ?? "ig", touchNo, variantTag(id, touchNo - 1)]
       );
     } else {
       await pool.query("UPDATE leads SET status=$1 WHERE id=$2", [status, id]);
@@ -238,6 +250,45 @@ app.post("/api/leads/:id/resolve-ig", async (req, res) => {
   const handle = await findIgHandle(lead.name, lead.area);
   if (handle) await pool.query("UPDATE leads SET ig_handle=$1 WHERE id=$2", [handle, id]);
   res.json({ ig_handle: handle });
+});
+
+/* ---------------------------------------------------------------------------
+   Send budget.
+
+   WHY THIS IS NOT A FIXED NUMBER.
+
+   A hard "20 a day" cap feels like the safety mechanism and mostly isn't.
+   Instagram restricts accounts on the SHAPE of the activity, and the inputs
+   that matter are, roughly in order: how similar the text is across
+   recipients, what fraction of recipients never interacted with you, the
+   rate at which recipients report or delete the request, and how
+   machine-regular the send intervals are. The daily count is a weak signal by
+   comparison — which is why accounts get restricted at five identical cold
+   DMs and survive fifty varied ones that earn replies.
+
+   The practical consequence: a LOW REPLY RATE IS THE BAN PREDICTOR. Replies
+   are the only observable proxy we have for "recipients find this wanted", so
+   the budget tracks reply rate and tightens when it falls, instead of trusting
+   a number someone picked. A run of no replies means the next send is riskier
+   than the last, not safer.
+
+   Burst is reported separately from the daily figure because twenty messages
+   in four minutes and twenty across an afternoon are not the same event, and
+   only the daily figure would call them equal.
+--------------------------------------------------------------------------- */
+app.get("/api/budget", async (_req, res) => {
+  /* Same numbers the DM bot enforces (src/dmcap.ts): hard ceiling 60/day,
+     warm-up 20 → 40 → 60 over the bot's first week, counting EVERY Instagram
+     send today — dashboard clicks and bot sends alike. Reply rate is shown as
+     the health signal: if it stays near zero, more volume only adds reports. */
+  const b = await dmBudget();
+  const { rows } = await pool.query(`
+    SELECT COUNT(*) FILTER (WHERE o.sent_at >= now() - interval '14 days')::int AS sent_14d,
+           COUNT(DISTINCT o.lead_id) FILTER (WHERE o.sent_at >= now() - interval '14 days' AND l.status='replied')::int AS replied_14d
+      FROM outreach o JOIN leads l ON l.id = o.lead_id WHERE o.channel='ig'`);
+  const r = rows[0];
+  res.json({ ...b, sent_14d: r.sent_14d, replied_14d: r.replied_14d,
+    reply_rate: r.sent_14d >= 20 ? r.replied_14d / r.sent_14d : null, burst: b.lastHour >= 8 });
 });
 
 app.get("/healthz", (_req, res) => res.json({ ok: true }));

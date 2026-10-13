@@ -218,8 +218,8 @@ function render() {
 
   const counter = $("#counter");
   counter.textContent = `${stats.sent_today ?? 0} DMs today`;
-  counter.className = (stats.sent_today ?? 0) >= 30 ? "warn" : "";
-  if ((stats.sent_today ?? 0) >= 30) counter.textContent += " — slow down";
+  counter.className = (stats.sent_today ?? 0) >= 60 ? "warn" : "";
+  if ((stats.sent_today ?? 0) >= 60) counter.textContent += " — slow down";
 
   $("#statbar").innerHTML = [
     [stats.total ?? 0, "Total", false],

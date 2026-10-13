@@ -6,3 +6,6 @@ leadflow.db*
 logs/
 .ig_cookies.json
 check.mjs
+.ig-profile/
+STOP-DMBOT
+logs/dmbot.lock

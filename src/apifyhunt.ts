@@ -43,7 +43,11 @@ const TOKEN = apifyToken();
 const ACTOR = "apify~instagram-scraper";
 
 // Aggregators, media and franchises — not local businesses we can sell to.
-const SKIP = /\b(magazine|academy|training|course|supply|supplies|products|official|news|daily|podcast|expo|association)\b/i;
+// 2026-10-13 additions, from hand-reviewing a "pool service" hunt where 31 of
+// 57 hot leads were junk: Spanish "mesas de pool" = pool TABLES (the Mesa, AZ
+// search), the surname Poole/Pooler (Savannah/Denver/Boise searches), and
+// non-US accounts (Abu Dhabi, Dubai/dxb, Italian SRL, Yorkshire, Canada).
+const SKIP = /\b(magazine|academy|training|course|supply|supplies|products|official|news|daily|podcast|expo|association|history|mesas?\s?de\s?pool(es)?|pooles?|pooler|billar|billiards?|abu\s?dhabi|dubai|dxb|srl|yorkshire|canada)\b/i;
 
 /**
  * Start the actor asynchronously and poll, rather than run-sync-get-dataset-items.

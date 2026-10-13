@@ -77,6 +77,28 @@ export async function init() {
   await pool.query(
     "UPDATE leads SET touches = 1, last_touch_at = COALESCE(contacted_at, now()) WHERE status = 'sent' AND touches = 0"
   );
+  /* DM sender control — the dashboard buttons write here, the Mac helper
+     (src/dmagent.ts) reads it and reports back. One row. The cloud dashboard
+     can't drive a browser on Gregg's Mac directly, so this row IS the wire
+     between the two. desired: what Gregg asked for; status/detail: what the
+     Mac is actually doing; connect_seq: bumped by "Connect Instagram". */
+  // Two processes (Render dashboard + Mac helper) can run init() at the same
+  // moment; concurrent CREATE TABLE IF NOT EXISTS can still collide on
+  // pg_type (23505). Losing that race means the table exists — carry on.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dm_control (
+      id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      desired TEXT NOT NULL DEFAULT 'stopped',
+      connect_seq INT NOT NULL DEFAULT 0,
+      resume_ok BOOLEAN NOT NULL DEFAULT false,
+      status TEXT NOT NULL DEFAULT 'not connected',
+      detail TEXT,
+      account TEXT,
+      agent_seen_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `).catch((e) => { if (e?.code !== "23505") throw e; });
+  await pool.query("INSERT INTO dm_control (id) VALUES (1) ON CONFLICT (id) DO NOTHING");
   // backfill state from trailing 2-letter code in area, e.g. "Miami FL" -> FL
   await pool.query(
     "UPDATE leads SET state = upper(substring(area from '([A-Za-z]{2})\\s*$')) WHERE state IS NULL AND area ~ '[A-Za-z]{2}\\s*$'"

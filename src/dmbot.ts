@@ -86,7 +86,7 @@ const BLOCK_TEXT = /try again later|action blocked|we restrict certain activity|
 async function checkBlocked(page: Page) {
   const url = page.url();
   if (/\/challenge|\/suspended|\/accounts\/(?:login|suspended|disabled)/.test(url))
-    haltForever(`Instagram redirected to ${url} — logged out, challenged or restricted. Open the bot window (npm run dmbot -- --login) and check the account.`);
+    haltForever(`Instagram redirected to ${url} — logged out, challenged or restricted. Click Connect Instagram in LeadFlow to log in again, and check the account in the Instagram app.`);
   const text = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
   const m = text.match(BLOCK_TEXT);
   if (m) haltForever(`Instagram showed "${m[0]}" — the account is being limited. Stop all DMs for at least 24-48h.`);
@@ -272,7 +272,7 @@ async function main() {
      looked for a login form on the homepage; logged out, Instagram doesn't
      always show one, and a test run happily went on visiting profiles. */
   const session = (await ctx.cookies("https://www.instagram.com")).some((c) => c.name === "sessionid" && c.value);
-  if (!session) haltForever("Not logged in to Instagram in the bot's window. Run: npm run dmbot -- --login");
+  if (!session) haltForever("Not logged in to Instagram — click Connect Instagram in LeadFlow.");
 
   let sent = 0;
   for (const lead of leads) {

@@ -157,6 +157,41 @@
     .card { grid-template-columns:34px 1fr; gap:0 10px }
     .score { width:34px }
   }
+
+  /* ---------- Instagram sender panel ---------- */
+  .dm { max-width:1080px; margin:14px auto 0; padding:0 22px }
+  .dm-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:12px 14px }
+  .dm-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap }
+  .dm-title { font-size:13px; font-weight:700; letter-spacing:-.1px }
+  .dm-pill { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+             padding:3px 8px; border-radius:999px; background:var(--surface-3); color:var(--muted) }
+  .dm-pill.sending { background:var(--accent-soft); color:var(--accent) }
+  .dm-pill.connected, .dm-pill.done { background:rgba(90,169,224,.12); color:var(--sky) }
+  .dm-pill.waiting, .dm-pill.connecting { background:rgba(212,168,63,.12); color:var(--amber) }
+  .dm-pill.blocked, .dm-pill.error, .dm-pill.notconn { background:rgba(242,112,110,.12); color:var(--red) }
+  .dm-meta { font-size:12px; color:var(--muted) }
+  .dm-meta b { color:var(--text); font-weight:650 }
+  .dm-mac { font-size:11.5px; color:var(--faint) } .dm-mac.on::before { content:"● "; color:var(--accent) } .dm-mac.off::before { content:"● "; color:var(--red) }
+  .dm-btns { margin-left:auto; display:flex; gap:6px }
+  .dm-btn { border:1px solid var(--border-2); background:var(--surface-2); color:var(--text); border-radius:6px;
+            padding:6px 11px; font-size:12px; font-weight:650; cursor:pointer }
+  .dm-btn:hover { border-color:var(--accent) } .dm-btn.go { background:var(--accent); color:#07150f; border-color:var(--accent) }
+  .dm-btn:disabled { opacity:.45; cursor:not-allowed }
+  .dm-detail { margin-top:8px; font-size:12px; color:var(--muted) }
+  .dm-detail.bad { color:var(--red) }
+  .dm-recent { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; font-size:11.5px; color:var(--faint) }
+  .dm-recent a { color:var(--muted); text-decoration:none; background:var(--surface-2); border-radius:5px; padding:2px 7px }
+  .dm-recent a:hover { color:var(--text) }
+
+  /* Phones: the filter row scrolls inside itself instead of widening the page
+     (it pushed the page 182px wide at 390px). */
+  @media (max-width:700px){
+    .toolbar { flex-wrap:wrap }
+    .seg { max-width:100%; overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none }
+    .seg::-webkit-scrollbar { display:none }
+    .chip { flex:none }
+    .selects { margin-left:0; padding-left:0; border-left:0 }
+  }
 </style>
 </head>
 <body>
@@ -186,6 +221,25 @@
     </div>
   </div>
 </header>
+<section class="dm" aria-label="Instagram sender">
+  <div class="dm-card">
+    <div class="dm-row">
+      <span class="dm-title">Instagram sender</span>
+      <span class="dm-pill" id="dm-pill">…</span>
+      <span class="dm-meta" id="dm-acct"></span>
+      <span class="dm-meta" id="dm-count"></span>
+      <span class="dm-meta" id="dm-queue"></span>
+      <span class="dm-mac" id="dm-mac"></span>
+      <div class="dm-btns">
+        <button class="dm-btn" id="dm-connect">Connect Instagram</button>
+        <button class="dm-btn go" id="dm-start">Start sending</button>
+        <button class="dm-btn" id="dm-stop">Stop</button>
+      </div>
+    </div>
+    <div class="dm-detail" id="dm-detail"></div>
+    <div class="dm-recent" id="dm-recent"></div>
+  </div>
+</section>
 <main id="list"><div class="empty">Loading…</div></main>
 <div class="keys" aria-hidden="true">
   <span><kbd>J</kbd><kbd>K</kbd>move</span><span><kbd>C</kbd>copy + open</span>
@@ -555,6 +609,52 @@ async function load() {
   await loadPage();
 }
 load();
+
+/* ---------- Instagram sender panel ----------
+   Buttons write intent; the helper on Gregg's Mac does the work and reports
+   status back through /api/dm. Polls every 10s. */
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const PILL = { "sending":"sending", "connected":"connected", "done for today":"done", "waiting":"waiting",
+                 "connecting":"connecting", "blocked":"blocked", "error":"error", "not connected":"notconn", "stopped":"" };
+  let last = null;
+  const post = (url, body) => fetch(url, { method:"POST", credentials:"same-origin",
+    headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) });
+  async function refresh() {
+    let d; try { const r = await fetch("/api/dm", { credentials:"same-origin" }); if (!r.ok) return; d = await r.json(); } catch { return; }
+    last = d;
+    const pill = $("dm-pill"); pill.textContent = d.status || "—"; pill.className = "dm-pill " + (PILL[d.status] ?? "");
+    $("dm-acct").innerHTML = d.account ? `from <b>@${String(d.account).replace(/^@/,"").replace(/</g,"&lt;")}</b>` : "no account connected";
+    $("dm-count").innerHTML = `<b>${d.budget.today}</b> / ${d.budget.cap} today`;
+    $("dm-queue").innerHTML = `<b>${d.queued}</b> hot in queue`;
+    const mac = $("dm-mac"); mac.className = "dm-mac " + (d.macOnline ? "on" : "off");
+    mac.textContent = d.macOnline ? "Mac online" : "Mac offline — wake it to send";
+    const det = $("dm-detail"); det.textContent = d.detail || ""; det.className = "dm-detail" + (["blocked","error"].includes(d.status) ? " bad" : "");
+    $("dm-recent").innerHTML = d.recent.length ? "Last sent: " + d.recent.map(r =>
+      `<a href="https://instagram.com/${encodeURIComponent(r.ig_handle)}" target="_blank" rel="noopener">@${r.ig_handle.replace(/</g,"&lt;")}${r.touch_no > 1 ? " · bump " + r.touch_no : ""}</a>`).join("") : "";
+    const running = d.desired === "running";
+    $("dm-start").disabled = running || !d.account || d.status === "connecting";
+    $("dm-stop").disabled = !running;
+    $("dm-connect").disabled = d.status === "connecting";
+    $("dm-connect").textContent = d.account ? "Reconnect Instagram" : "Connect Instagram";
+  }
+  $("dm-connect").onclick = async () => {
+    if (last && !last.macOnline) return alert("Your Mac's LeadFlow helper is offline. Make sure the Mac is on and awake, then try again.");
+    await post("/api/dm/connect"); refresh();
+    alert("A Chrome window is opening on your Mac. Log in to the Instagram account to send from — the window closes by itself when you're in.");
+  };
+  $("dm-start").onclick = async () => {
+    const r = await post("/api/dm/start");
+    if (r.status === 409) {
+      const j = await r.json();
+      if (!confirm("Instagram limited the account:\n\n" + (j.detail || "") + "\n\nResuming too soon can turn a short block into a long one. Resume anyway?")) return;
+      await post("/api/dm/start", { confirm: true });
+    }
+    refresh();
+  };
+  $("dm-stop").onclick = async () => { await post("/api/dm/stop"); refresh(); };
+  refresh(); setInterval(refresh, 10000);
+})();
 </script>
 </body>
 </html>

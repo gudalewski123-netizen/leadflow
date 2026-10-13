@@ -291,6 +291,41 @@ app.get("/api/budget", async (_req, res) => {
     reply_rate: r.sent_14d >= 20 ? r.replied_14d / r.sent_14d : null, burst: b.lastHour >= 8 });
 });
 
+/* ---------- Instagram sender (DM bot) controls ----------
+   The buttons only write intent into dm_control; the helper on Gregg's Mac
+   (src/dmagent.ts) does the actual work and writes status back. If the Mac
+   is asleep the panel says so instead of pretending. */
+app.get("/api/dm", async (_req, res) => {
+  const ctl = (await pool.query("SELECT * FROM dm_control WHERE id=1")).rows[0] ?? {};
+  const b = await dmBudget();
+  const recent = (await pool.query(
+    `SELECT l.ig_handle, o.touch_no, o.sent_at FROM outreach o JOIN leads l ON l.id=o.lead_id
+      WHERE o.note LIKE '%dmbot%' ORDER BY o.sent_at DESC LIMIT 8`)).rows;
+  const queued = (await pool.query(
+    `SELECT COUNT(*)::int n FROM leads WHERE ig_handle IS NOT NULL AND ig_handle <> ''
+       AND status='new' AND hot_score >= 60 AND hot_score_orig IS NULL`)).rows[0].n;
+  const seen = ctl.agent_seen_at ? Date.now() - new Date(ctl.agent_seen_at).getTime() : null;
+  res.json({ ...ctl, macOnline: seen !== null && seen < 90_000, budget: b, recent, queued });
+});
+app.post("/api/dm/connect", async (_req, res) => {
+  await pool.query("UPDATE dm_control SET connect_seq = connect_seq + 1, updated_at = now() WHERE id=1");
+  res.json({ ok: true });
+});
+app.post("/api/dm/start", async (req, res) => {
+  const ctl = (await pool.query("SELECT status, detail, account FROM dm_control WHERE id=1")).rows[0];
+  if (!ctl?.account) return res.status(400).json({ error: "Connect an Instagram account first." });
+  const confirm = Boolean((req.body as any)?.confirm);
+  // After Instagram has limited the account, resuming takes a second, explicit yes.
+  if (ctl?.status === "blocked" && !confirm)
+    return res.status(409).json({ needsConfirm: true, detail: ctl.detail });
+  await pool.query("UPDATE dm_control SET desired='running', resume_ok=$1, updated_at=now() WHERE id=1", [confirm]);
+  res.json({ ok: true });
+});
+app.post("/api/dm/stop", async (_req, res) => {
+  await pool.query("UPDATE dm_control SET desired='stopped', updated_at=now() WHERE id=1");
+  res.json({ ok: true });
+});
+
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
 await init();

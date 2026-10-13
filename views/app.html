@@ -476,25 +476,17 @@ function msgFor(l) {
   if (active === "no_aeo") {
     return `Hey! I help local ${l.niche ?? "businesses"} show up when people ask ChatGPT, Siri, or Google's AI for recommendations. I had a look at ${name}'s site and it isn't set up for AI search yet — which is fast becoming how people find businesses. I'd love to show you a quick free example of what it could look like. No pressure at all!`;
   }
-  // A business that's ON Instagram usually has a website linked in their bio even
-  // when Google Maps shows none — so NEVER tell them "you don't have a website."
-  // Use a neutral pitch that works whether it's a first site or an upgrade.
-  if (l.ig_handle) {
-    /* This guard exists so an IG lead is never told they have no website —
-       their bio usually has one even when Google Maps shows none. It only
-       matched explicit negations ("you don't have a website"), so the stored
-       opener "Couldn't find one linked on your page" walked straight through
-       it: on 2026-09-23 all 45 IG hot leads carrying a stored message were
-       asserting no-website, and all 45 slipped past. Now it also catches the
-       "couldn't find / didn't see / no website" family. */
-    if (l.message && l.message.trim() && !CLAIMS_NO_SITE.test(l.message))
-      return l.message;
-    return `Hey! I design clean, modern websites for local ${l.niche ?? "businesses"} and came across ${name}. I'd love to put together a free mockup showing what a polished site could look like for you — whether it's a first site or an upgrade. No pressure at all, just thought it might be useful!`;
-  }
-  if (l.message && l.message.trim()) return l.message;
-  if (l.category === "bad_site")
-    return `Hey! I design websites for local businesses and noticed ${name}'s site could use a refresh. I'd love to put together a free mockup so you can see what an updated version could look like — no pressure at all. Let me know if you're interested!`;
-  return `Hey! I design websites for local businesses and noticed ${name} doesn't have one yet. I'd love to put together a free mockup so you can see what it could look like — no pressure at all. Let me know if you're interested!`;
+  /* Gregg, 2026-10-13: openers are in his voice ("I was looking at your
+     Instagram page and noticed that you don't have a website — I'd love to
+     create you a free demo"). The server picks one per lead (l.opener, from
+     variants.ts — a site-safe version when the lead HAS a website). `message`
+     on ~155k rows is just the old universal opener, not a draft, so it is
+     ignored; a real hand-edited draft still wins — unless it tells a lead
+     WITH a website that it has none. */
+  const draft = l.message && l.message.trim() && !/^Hey! Quick question — do you have a website for your business\?$/.test(l.message.trim()) ? l.message : null;
+  if (draft && !(l.website && CLAIMS_NO_SITE.test(draft))) return draft;
+  if (l.opener) return l.opener;
+  return `Hi, I hope all is well! I was looking at your page and noticed that you don't have a website. I'd love to create you a free demo if you're interested?`;
 }
 
 window.setFilter = (k) => { active = k; loadPage(); };

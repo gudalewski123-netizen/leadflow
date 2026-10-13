@@ -164,7 +164,7 @@ app.get("/api/leads", async (req, res) => {
      choice is deterministic from (id, touches) anyway — so it is free to
      compute and always consistent with what the follow-up logic will pick
      next. `message` still wins when it holds a real hand-written draft. */
-  for (const r of rows) r.opener = openerFor(r.id, r.touches ?? 0);
+  for (const r of rows) r.opener = openerFor(r.id, r.touches ?? 0, Boolean(r.website));
   res.json({ leads: rows, total });
 });
 

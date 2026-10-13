@@ -67,7 +67,7 @@ async function setStatus(status: string, detail: string | null = null, extra: Re
    session shows up we copy it into the bot's profile and check it works. */
 async function launchBot(headless: boolean, userAgent?: string) {
   const opts = { headless, userAgent, viewport: { width: 1100, height: 820 }, args: ["--disable-blink-features=AutomationControlled"] };
-  return chromium.launchPersistentContext(PROFILE, { ...opts, channel: "chrome" })
+  return chromium.launchPersistentContext(PROFILE, { ...opts, channel: "chrome", ignoreDefaultArgs: ["--no-sandbox"] })
     .catch(() => chromium.launchPersistentContext(PROFILE, opts));
 }
 

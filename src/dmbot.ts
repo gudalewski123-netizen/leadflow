@@ -32,7 +32,7 @@ import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pool, init } from "./db.js";
-import { openerFor, variantTag, OPENERS } from "./variants.js";
+import { openerFor, variantTag, OURS } from "./variants.js";
 import { threadState, realLines } from "./dmthread.js";
 import { budget, hourInTZ, HARD_CAP, WARMUP } from "./dmcap.js";
 
@@ -180,8 +180,8 @@ async function sendOne(page: Page, lead: Lead): Promise<"sent" | "skip"> {
     // A brand-new lead must have an empty thread; anything there means a
     // conversation already exists that LeadFlow doesn't know about.
     const real = realLines(thread, lead.ig_handle);
-    if (real.some((l) => OPENERS.includes(l) || l.length > 12)) {
-      const hadUs = real.some((l) => OPENERS.includes(l));
+    if (real.some((l) => OURS.includes(l) || l.length > 12)) {
+      const hadUs = real.some((l) => OURS.includes(l));
       await setStatus(lead.id, hadUs ? "sent" : "replied", hadUs ? "thread already had our opener" : "thread already had a conversation — check by hand");
       log(`@${lead.ig_handle}: existing thread found → ${hadUs ? "sent" : "replied"} (not messaged)`);
       return "skip";
@@ -230,7 +230,7 @@ async function launch(): Promise<BrowserContext> {
     args: ["--disable-blink-features=AutomationControlled"],
   };
   // Real Chrome looks like a person's browser; Playwright's bundled Chromium is the fallback.
-  return chromium.launchPersistentContext(PROFILE, { ...opts, channel: "chrome" })
+  return chromium.launchPersistentContext(PROFILE, { ...opts, channel: "chrome", ignoreDefaultArgs: ["--no-sandbox"] })
     .catch(() => chromium.launchPersistentContext(PROFILE, opts));
 }
 

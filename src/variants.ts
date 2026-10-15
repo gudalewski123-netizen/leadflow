@@ -15,6 +15,10 @@
  * So the lever here is text diversity, not volume.
  *
  * Rules every variant must obey:
+ *  0. 2026-10-15: only say what is TRUE. "You don't have a website" went to ~12 businesses whose
+ *     Instagram bio linked their own site (IG leads never had a website lookup). Openers now say we
+ *     didn't SEE one on their Instagram, and only go to leads with no website on file after
+ *     sitecheck.ts records bio-link websites.
  *  1. Gregg, 2026-10-13: the openers are in HIS voice — the message he has
  *     sent by hand many times: "hi I hope all is well, I was looking at your
  *     instagram page and noticed that you didn't have a website. I'd love to
@@ -33,14 +37,14 @@
 
 /* Touch 1 — the cold open, for leads with NO website. */
 export const OPENERS: string[] = [
-  "Hi, I hope all is well! I was looking at your Instagram page and noticed that you don't have a website. I'd love to create you a free demo if you're interested?",
-  "Hey, hope all is well! I came across your Instagram and noticed there's no website linked. I'd love to put together a free demo site for you if you're interested?",
-  "Hi! Hope you're doing well. I was checking out your Instagram page and saw you don't have a website yet — I'd be happy to build you a free demo if you're interested.",
-  "Hey, I hope all is well with you! I was looking through your Instagram and noticed you don't have a website. If you're interested, I'd love to make you a free demo.",
-  "Hi there, hope all is well! I noticed on your Instagram that you don't have a website for the business. I'd love to create a free demo for you — would you be interested?",
-  "Hey! Hope business is going well. I was on your Instagram page and noticed you don't have a website — I'd love to put together a free demo for you if you're interested?",
-  "Hi, hope all is well! I came across your page on Instagram and saw there's no website. Would you like me to create a free demo for you? No strings attached.",
-  "Hey, I hope all is well! I was looking at your Instagram and noticed you don't have a website yet. I'd love to build you a free demo if that's something you'd be interested in?",
+  "Hi, I hope all is well! I was looking at your Instagram page and didn't see a website for the business. I'd love to create you a free demo if you're interested?",
+  "Hey, hope all is well! I came across your Instagram and didn't see a website linked. I'd love to put together a free demo site for you if you're interested?",
+  "Hi! Hope you're doing well. I was checking out your Instagram page and couldn't find a website for the business — I'd be happy to build you a free demo if you're interested.",
+  "Hey, I hope all is well with you! I was looking through your Instagram and didn't see a website. If you're interested, I'd love to make you a free demo.",
+  "Hi there, hope all is well! I didn't see a website on your Instagram for the business. I'd love to create a free demo for you — would you be interested?",
+  "Hey! Hope business is going well. I was on your Instagram page and didn't see a website linked — I'd love to put together a free demo for you if you're interested?",
+  "Hi, hope all is well! I came across your page on Instagram and didn't spot a website. Would you like me to create a free demo for you? No strings attached.",
+  "Hey, I hope all is well! I was looking at your Instagram and didn't see a website yet. I'd love to build you a free demo if that's something you'd be interested in?",
 ];
 
 /* Touch 1 for leads that DO have a website (dashboard only — never sent by the bot). */
@@ -72,6 +76,14 @@ export const CLOSERS: string[] = [
    Kept ONLY so the bot recognises a thread that already has one of them and
    doesn't open a second time. Never sent again. */
 export const LEGACY: string[] = [
+  "Hi, I hope all is well! I was looking at your Instagram page and noticed that you don't have a website. I'd love to create you a free demo if you're interested?",
+  "Hey, hope all is well! I came across your Instagram and noticed there's no website linked. I'd love to put together a free demo site for you if you're interested?",
+  "Hi! Hope you're doing well. I was checking out your Instagram page and saw you don't have a website yet — I'd be happy to build you a free demo if you're interested.",
+  "Hey, I hope all is well with you! I was looking through your Instagram and noticed you don't have a website. If you're interested, I'd love to make you a free demo.",
+  "Hi there, hope all is well! I noticed on your Instagram that you don't have a website for the business. I'd love to create a free demo for you — would you be interested?",
+  "Hey! Hope business is going well. I was on your Instagram page and noticed you don't have a website — I'd love to put together a free demo for you if you're interested?",
+  "Hi, hope all is well! I came across your page on Instagram and saw there's no website. Would you like me to create a free demo for you? No strings attached.",
+  "Hey, I hope all is well! I was looking at your Instagram and noticed you don't have a website yet. I'd love to build you a free demo if that's something you'd be interested in?",
   "Hey! Quick question — do you have a website for your business?",
   "Hey, quick one — is there a website for the business anywhere?",
   "Hi! Do you guys have a site up, or is it mostly Instagram right now?",

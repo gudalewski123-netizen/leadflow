@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
+import { syncWebsitesFromBio } from "./sitecheck.js";
 import { openerFor, variantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
 import { findIgHandle } from "./findig.js";
@@ -127,7 +128,7 @@ app.get("/api/leads", async (req, res) => {
      lately, and silently binning 838 prospects over our own stale scrape is
      worse than showing them. The card shows how old the reading is instead —
      see the stale badge in views/app.html — so the operator can judge it. */
-  else if (status === "hot") conds.push("status='new'", "hot_score >= 60");
+  else if (status === "hot") conds.push("status='new'", "hot_score >= 60", "(website IS NULL OR website = '')");
   // New: few posts but posting recently — see isLikelyNewBusiness() in
   // score.ts. Tagged into hot_why at scoring time.
   else if (status === "new_business") conds.push("status='new'", "hot_why LIKE '%NEW BUSINESS%'");
@@ -189,7 +190,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE status = 'new')::int AS to_contact,
       COUNT(*) FILTER (WHERE category = 'no_site' AND status = 'new')::int AS no_site,
-      COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60)::int AS hot,
+      COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60 AND (website IS NULL OR website = ''))::int AS hot,
       COUNT(*) FILTER (WHERE status = 'new' AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today
@@ -303,7 +304,7 @@ app.get("/api/dm", async (_req, res) => {
       WHERE o.note LIKE '%dmbot%' ORDER BY o.sent_at DESC LIMIT 8`)).rows;
   const queued = (await pool.query(
     `SELECT COUNT(*)::int n FROM leads WHERE ig_handle IS NOT NULL AND ig_handle <> ''
-       AND status='new' AND hot_score >= 60 AND hot_score_orig IS NULL`)).rows[0].n;
+       AND status='new' AND hot_score >= 60 AND hot_score_orig IS NULL AND (website IS NULL OR website = '')`)).rows[0].n;
   const seen = ctl.agent_seen_at ? Date.now() - new Date(ctl.agent_seen_at).getTime() : null;
   res.json({ ...ctl, macOnline: seen !== null && seen < 90_000, budget: b, recent, queued });
 });
@@ -329,5 +330,8 @@ app.post("/api/dm/stop", async (_req, res) => {
 app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
 await init();
+// a bio link to the business's own domain means they HAVE a website — record it before anything is listed
+syncWebsitesFromBio(pool).then((n) => n && console.log(`sitecheck: ${n} websites recorded from bio links`)).catch(() => {});
+setInterval(() => syncWebsitesFromBio(pool).catch(() => {}), 60 * 60_000);
 const PORT = Number(process.env.PORT ?? 4571);
 app.listen(PORT, () => console.log(`LeadFlow → http://localhost:${PORT}`));

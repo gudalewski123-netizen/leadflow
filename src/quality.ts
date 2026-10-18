@@ -18,7 +18,7 @@ export const NOT_US = /(\b(uk|u\.k\.|united kingdom|england|scotland|wales|irela
 /** Cyrillic, Arabic, Thai, Devanagari, CJK, Hangul in the NAME (Russian-language detailers, 餘光角落) */
 export const FOREIGN_SCRIPT = /[Ѐ-ӿ؀-ۿ฀-๿ऀ-ॿ぀-ヿ一-鿿가-힯]/;
 /** UK/foreign trade vocabulary — matched inside handles too ("alphavaleting", "southmanc_handyman") */
-export const FOREIGN_WORDS = /(valeting|jet\s?wash|groundworks|tarmac|\bltd\b|gardening\s?services|garden\s?maintenance|\bmanc\b|southmanc|landscapesuk|\buk$|kontraktor|bangunan|arsitek|\bjasa\b|tukang|wiltshire|digbeth|birmingham\s?uk|\bessex\b|\bsurrey\b|\bdevon\b|cornwall|cymru)/i;
+export const FOREIGN_WORDS = /(valeting|jet\s?wash|groundworks|tarmac|\bltd\b|gardening\s?services|garden\s?maintenance|\bmanc\b|southmanc|landscapesuk|\buk$|kontraktor|bangunan|arsitek|\bjasa\b|tukang|wiltshire|digbeth|birmingham\s?uk|\bessex\b|\bsurrey\b|\bdevon\b|cornwall|cymru|mistri|karigar|thekedar|\.sby\b|\.jkt\b|\.bdg\b)/i;
 /** artists filed under "painting" (murals, airbrush, face painting, portfolios) */
 export const ARTIST = /(\bart\b|\barts\b|artist|airbrush|mural|henna|face\s?paint|facepaint|sculpt|canvas|gallery|\bpaintings\b|illustrat)/i;
 /** …unless it plainly says contractor ("Gekon Construction | Renovations | Paintings", "Art E Colour Painting & Renovations") */

@@ -24,6 +24,12 @@ export const NICHE_WORDS: Record<string, string[]> = {
   "auto detailing":   ["detail","auto","car","wash","ceramic","shine","valet","spa"],
   "pressure washing": ["pressure","power","wash","clean","exterior","soft","hydro","jet","streak","grime"],
   "window cleaning":  ["window","glass","clean","pane","streak"],
+  // 2026-10-18 hunt trades — without these the name test fell back to the niche's own words and
+  // threw out "TerraVerse Landscaping and Design" as not-hardscaping
+  "hardscaping":      ["hardscap","landscap","paver","patio","retaining","stone","outdoor living","firepit","fire pit","masonry"],
+  "masonry":          ["mason","brick","stone","block","chimney","stucco","concrete","paver","tuckpoint"],
+  "epoxy flooring":   ["epoxy","floor","coating","garage","concrete","polyaspartic","resin","flake"],
+  "christmas light installation": ["christmas","holiday","light","lighting","decor","xmas","bright","glow"],
   "gutter cleaning":  ["gutter","downspout","clean","exterior","leaf"],
   "roofing":          ["roof","shingle","exterior","construct","contract","restor","storm","metal","gutter","energy"],
   "painting":         ["paint","coat","finish","decor","drywall","stain","contract","construct","renovat","remodel"],

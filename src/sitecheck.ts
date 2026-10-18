@@ -30,8 +30,8 @@ export type LinkKind = "website" | "not_a_site" | "none";
 /* A link-in-bio page we have NOT looked inside yet may well list a website (150 of 226 did — linkpage.ts,
    2026-10-18). Until checked, such a lead is not "no website". */
 export const LINKPAGE_UNCHECKED_SQL =
-  `(ig_link ~* '(linktr\\.ee|linkin\\.bio|lnk\\.bio|bio\\.link|beacons\\.ai|tap\\.bio|msha\\.ke|solo\\.to|campsite\\.bio|linkr\\.bio|taplink\\.cc|hoo\\.be|allmylinks\\.com|direct\\.me|linkpop\\.com|linkfly\\.to|bit\\.ly|tinyurl\\.com|carrd\\.co|stan\\.store|sites\\.google\\.com)'
-    AND linkpage_checked_at IS NULL)`;
+  `(COALESCE(ig_link, '') ~* '(linktr\\.ee|linkin\\.bio|lnk\\.bio|bio\\.link|beacons\\.ai|tap\\.bio|msha\\.ke|solo\\.to|campsite\\.bio|linkr\\.bio|taplink\\.cc|hoo\\.be|allmylinks\\.com|direct\\.me|linkpop\\.com|linkfly\\.to|bit\\.ly|tinyurl\\.com|carrd\\.co|stan\\.store|sites\\.google\\.com)'
+    AND linkpage_checked_at IS NULL)`;   // COALESCE: a NULL link made the whole test NULL and dropped every no-link lead (10-18)
 
 /* Trades Gregg doesn't sell to (2026-10-18: "I don't care about hair salons"). Kept in the database,
    left out of every outreach queue. */

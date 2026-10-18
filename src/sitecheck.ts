@@ -27,6 +27,21 @@ const NOT_A_SITE = [
 
 export type LinkKind = "website" | "not_a_site" | "none";
 
+/* A link-in-bio page we have NOT looked inside yet may well list a website (150 of 226 did — linkpage.ts,
+   2026-10-18). Until checked, such a lead is not "no website". */
+export const LINKPAGE_UNCHECKED_SQL =
+  `(ig_link ~* '(linktr\\.ee|linkin\\.bio|lnk\\.bio|bio\\.link|beacons\\.ai|tap\\.bio|msha\\.ke|solo\\.to|campsite\\.bio|linkr\\.bio|taplink\\.cc|hoo\\.be|allmylinks\\.com|direct\\.me|linkpop\\.com|linkfly\\.to|bit\\.ly|tinyurl\\.com|carrd\\.co|stan\\.store|sites\\.google\\.com)'
+    AND linkpage_checked_at IS NULL)`;
+
+/* The "No site" Instagram queue (2026-10-18, Gregg: "these leads are hot garbage" — the tab was 5,929
+   June Google-Maps rows, only 7 with a handle and none ever opened). A lead qualifies only when we
+   LOOKED: Instagram read via Apify, no website in the bio or inside its link page, posting in the last
+   60 days, and a follower count a real local business has. */
+export const IG_NO_SITE_SQL =
+  `(status = 'new' AND ig_handle IS NOT NULL AND ig_handle <> '' AND ig_checked_at IS NOT NULL
+    AND (website IS NULL OR website = '') AND NOT ${LINKPAGE_UNCHECKED_SQL}
+    AND last_active > now() - interval '60 days' AND COALESCE(ig_followers, 0) BETWEEN 80 AND 15000)`;
+
 export function classifyLink(url: string | null | undefined): LinkKind {
   if (!url || !url.trim()) return "none";
   let host = "";

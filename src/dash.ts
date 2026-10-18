@@ -7,7 +7,8 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
-import { syncWebsitesFromBio } from "./sitecheck.js";
+import { syncWebsitesFromBio, IG_NO_SITE_SQL } from "./sitecheck.js";
+import { checkLinkPages, ensureLinkpageColumn } from "./linkpage.js";
 import { openerFor, variantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
 import { findIgHandle } from "./findig.js";
@@ -107,7 +108,11 @@ app.get("/api/leads", async (req, res) => {
   const p = (v: any) => { params.push(v); return "$" + params.length; };
 
   if (status === "new") conds.push("status='new'");
-  else if (status === "no_site") conds.push("status='new'", "category='no_site'");
+  /* No site = Instagram leads we have VERIFIED have no website (IG_NO_SITE_SQL), plus Google-Maps rows
+     with a phone and no handle — those are text-only leads, kept out of the Instagram view. The old tab
+     was the Maps rows alone; "On Instagram" showed 7 unverified guessed handles. */
+  else if (status === "no_site")
+    conds.push(`(${IG_NO_SITE_SQL} OR (status='new' AND category='no_site' AND (ig_handle IS NULL OR ig_handle='') AND phone IS NOT NULL))`);
   else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
   // No AEO: has a website but no schema.org structured data — pitch AI-search visibility
   else if (status === "no_aeo") conds.push("status='new'", "website IS NOT NULL", "has_aeo = false");
@@ -157,7 +162,10 @@ app.get("/api/leads", async (req, res) => {
   const rows = (await pool.query(
     // hot_score leads the sort: reviews are NULL on ~99% of no-site leads, so
     // ordering by reviews alone was effectively random.
-    `SELECT * FROM leads ${where} ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
+    status === "no_site"
+      // most recently active Instagram accounts first; Maps text-only rows after them
+      ? `SELECT * FROM leads ${where} ORDER BY (ig_checked_at IS NOT NULL) DESC, last_active DESC NULLS LAST, ig_followers DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`
+      : `SELECT * FROM leads ${where} ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
     params
   )).rows;
   /* Attach the varied opener here rather than storing it. Writing a variant
@@ -189,7 +197,7 @@ app.get("/api/stats", async (_req, res) => {
     SELECT
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE status = 'new')::int AS to_contact,
-      COUNT(*) FILTER (WHERE category = 'no_site' AND status = 'new')::int AS no_site,
+      COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL})::int AS no_site,
       COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60 AND (website IS NULL OR website = ''))::int AS hot,
       COUNT(*) FILTER (WHERE status = 'new' AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
@@ -333,5 +341,9 @@ await init();
 // a bio link to the business's own domain means they HAVE a website — record it before anything is listed
 syncWebsitesFromBio(pool).then((n) => n && console.log(`sitecheck: ${n} websites recorded from bio links`)).catch(() => {});
 setInterval(() => syncWebsitesFromBio(pool).catch(() => {}), 60 * 60_000);
+// look inside new link-in-bio pages too (polite: ~0.4 s apart), hourly
+ensureLinkpageColumn(pool).then(() => checkLinkPages(pool, { quiet: true }))
+  .then((n) => n && console.log(`linkpage: ${n} websites found inside link pages`)).catch(() => {});
+setInterval(() => checkLinkPages(pool, { quiet: true }).catch(() => {}), 60 * 60_000);
 const PORT = Number(process.env.PORT ?? 4571);
 app.listen(PORT, () => console.log(`LeadFlow → http://localhost:${PORT}`));

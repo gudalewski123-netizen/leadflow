@@ -53,7 +53,9 @@ export const NICHE_WORDS: Record<string, string[]> = {
  * it names no trade — "Hometown Haulers KC LLC". Kept short on purpose: every
  * entry is a hole the junk can climb back through.
  */
-const GENERIC = ["llc", " inc", "inc.", "co.", "services", "service", "solutions", "company", "contracting", "enterprise"];
+const GENERIC = ["llc", " inc", "inc.", "co.", "services", "service", "solutions", "company", "contracting", "enterprise",
+  // 2026-10-18: real trades that failed the niche words ("Spokane Contractor", "Annex Outdoor Care", "Jasani Parking")
+  "contractor", "construction", "outdoor", "exterior", "parking", "paving", "remodel", "renovation", "repair"];
 
 /**
  * Above this, it is a brand, a chain, a public figure or a fan account — not a

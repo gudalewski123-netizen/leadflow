@@ -21,7 +21,9 @@
     "start": "tsx src/dash.ts",
     "handles": "tsx src/handles.ts",
     "maps": "tsx src/mapshunt.ts",
-    "dmbot": "tsx src/dmbot.ts"
+    "dmbot": "tsx src/dmbot.ts",
+    "linkpage": "tsx src/linkpage.ts",
+    "sweep": "tsx src/sweep.ts"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

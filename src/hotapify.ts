@@ -92,12 +92,22 @@ await pool.query(`
     ADD COLUMN IF NOT EXISTS ig_checked_at TIMESTAMPTZ
 `);
 
+/* --refresh (2026-10-18): re-read verified NO-WEBSITE leads whose reading is over 3 days old, most
+   recently active first — the "No site" queue was ranking on posting dates from August. Un-scored
+   handles are the default mode, as before. */
+const REFRESH = process.argv.includes("--refresh");
 const leads = (
   await pool.query(
-    `SELECT id, ig_handle FROM leads
-      WHERE ig_handle IS NOT NULL AND status='new' AND ig_checked_at IS NULL
-      ORDER BY (source = 'ig_search') DESC NULLS LAST, id DESC
-      LIMIT $1`,
+    REFRESH
+      ? `SELECT id, ig_handle FROM leads
+          WHERE ig_handle IS NOT NULL AND ig_handle <> '' AND status='new' AND ig_checked_at < now() - interval '3 days'
+            AND (website IS NULL OR website = '')
+          ORDER BY last_active DESC NULLS LAST, ig_followers DESC NULLS LAST
+          LIMIT $1`
+      : `SELECT id, ig_handle FROM leads
+          WHERE ig_handle IS NOT NULL AND status='new' AND ig_checked_at IS NULL
+          ORDER BY (source = 'ig_search') DESC NULLS LAST, id DESC
+          LIMIT $1`,
     [LIMIT]
   )
 ).rows as { id: number; ig_handle: string }[];

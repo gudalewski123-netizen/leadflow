@@ -27,7 +27,8 @@
  * queue get identical text and a follow-up never repeats the first message.
  */
 import { chromium, type BrowserContext, type Page } from "playwright";
-import { syncWebsitesFromBio } from "./sitecheck.js";
+import { syncWebsitesFromBio, LINKPAGE_UNCHECKED_SQL } from "./sitecheck.js";
+import { checkLinkPages } from "./linkpage.js";
 import { existsSync, writeFileSync, unlinkSync, readFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -117,7 +118,8 @@ async function queue(limit: number): Promise<Lead[]> {
                AND EXISTS (SELECT 1 FROM outreach o WHERE o.lead_id = leads.id
                              AND o.touch_no = leads.touches AND o.note LIKE '%dmbot%'))
          OR (status='new' AND hot_score >= 60 AND hot_score_orig IS NULL
-             AND (website IS NULL OR website = ''))   -- never tell a business with a site it has none (2026-10-15)
+             AND (website IS NULL OR website = '')   -- never tell a business with a site it has none (2026-10-15)
+             AND NOT ${LINKPAGE_UNCHECKED_SQL})       -- …including one listed inside its Linktree (2026-10-18)
       )
       ORDER BY (status='sent') DESC, hot_score DESC NULLS LAST, id
       LIMIT $1`,
@@ -256,6 +258,8 @@ async function main() {
   await init();
   const found = await syncWebsitesFromBio(pool);   // a bio link to their own domain = they HAVE a website
   if (found) log(`sitecheck: recorded ${found} websites from Instagram bio links — those leads won't get a no-website DM`);
+  const inside = await checkLinkPages(pool, { quiet: true }).catch(() => 0);
+  if (inside) log(`linkpage: found ${inside} websites inside link-in-bio pages — those leads won't get a no-website DM`);
   const h = hourInTZ();
   if (!DRY && (h < START_HOUR || h >= END_HOUR)) { log(`outside sending hours (${START_HOUR}:00–${END_HOUR}:00 Eastern; now ${h}:00) — nothing sent`); cleanup(); process.exit(0); }
 

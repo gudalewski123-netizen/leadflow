@@ -22,6 +22,7 @@ import { pool, init } from "./db.js";
 import { STATE_CITIES, ALL_STATES } from "./cities.js";
 import { scoreOf, isFranchise, type Profile } from "./score.js";
 import { isRelevant, searchTermFor, MAX_FOLLOWERS } from "./relevance.js";
+import { junkReason } from "./quality.js";
 
 const TARGET = Number(process.argv[2] ?? 5000);
 const NICHES = (process.argv[3] ??
@@ -251,6 +252,9 @@ async function runJob(j: { niche: string; city: string; state: string }) {
       const bio = String(it.biography ?? "");
       if ((it.followersCount ?? 0) > MAX_FOLLOWERS) { rejBig++; continue; }
       if (!isRelevant(j.niche, full, h, bio)) { rejIrrelevant++; continue; }
+      // the shared gate (src/quality.ts): not US, agencies, artists-as-painters, creators, personal accounts
+      const ext0 = it.externalUrl ?? (Array.isArray(it.externalUrls) && it.externalUrls[0]?.url) ?? null;
+      if (junkReason({ name: full, ig_handle: h, niche: j.niche, ig_followers: it.followersCount, ig_link: ext0, bio }, true)) { rejIrrelevant++; continue; }
 
       known.add(h); // shared across workers, so no two claim the same handle
 

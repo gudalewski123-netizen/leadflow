@@ -164,7 +164,11 @@ console.log(`Queries already run in the last ${REFRESH_DAYS}d (will skip): ${don
 // niche-major so every trade sweeps the country before the next one starts —
 // otherwise one niche in one state hogs the whole budget.
 const jobs: { niche: string; city: string; state: string }[] = [];
-for (const niche of NICHES)
+/* HUNT_JOBS=path.json — an exact list of {niche, city, state} searches (2026-10-18: the default grid of
+   20 trades x top-3 cities x 50 states was fully run this cycle, so the last of the budget went to
+   untouched pools — new trades and next-tier cities — instead of re-reading known accounts). */
+if (process.env.HUNT_JOBS) jobs.push(...JSON.parse(fs.readFileSync(process.env.HUNT_JOBS, "utf8")));
+else for (const niche of NICHES)
   for (const st of ALL_STATES)
     for (const city of (STATE_CITIES[st] ?? []).slice(0, 3)) jobs.push({ niche, city, state: st });
 
@@ -229,7 +233,8 @@ async function runJob(j: { niche: string; city: string; state: string }) {
     // A failed run must NOT be recorded as swept, or that city is skipped for
     // HUNT_REFRESH_DAYS despite never having been searched.
     if (items === null) return;
-    if (queries % 20 === 0) await checkSpend(); // ~every 20 runs, cheap to poll
+    // ~every 20 runs, cheap to poll — every run once within $1.50 of the ceiling (the last-dollar hunt)
+    if (queries % 20 === 0 || MAX_SPEND - spend < 1.5) await checkSpend();
     let newHere = 0;
 
     for (const it of items) {

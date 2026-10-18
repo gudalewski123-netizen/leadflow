@@ -27,7 +27,7 @@
  * queue get identical text and a follow-up never repeats the first message.
  */
 import { chromium, type BrowserContext, type Page } from "playwright";
-import { syncWebsitesFromBio, LINKPAGE_UNCHECKED_SQL } from "./sitecheck.js";
+import { syncWebsitesFromBio, LINKPAGE_UNCHECKED_SQL, NOT_EXCLUDED_NICHE_SQL } from "./sitecheck.js";
 import { checkLinkPages } from "./linkpage.js";
 import { existsSync, writeFileSync, unlinkSync, readFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -119,7 +119,8 @@ async function queue(limit: number): Promise<Lead[]> {
                              AND o.touch_no = leads.touches AND o.note LIKE '%dmbot%'))
          OR (status='new' AND hot_score >= 60 AND hot_score_orig IS NULL
              AND (website IS NULL OR website = '')   -- never tell a business with a site it has none (2026-10-15)
-             AND NOT ${LINKPAGE_UNCHECKED_SQL})       -- …including one listed inside its Linktree (2026-10-18)
+             AND NOT ${LINKPAGE_UNCHECKED_SQL}       -- …including one listed inside its Linktree (2026-10-18)
+             AND ${NOT_EXCLUDED_NICHE_SQL})            -- no hair salons (Gregg, 2026-10-18)
       )
       ORDER BY (status='sent') DESC, hot_score DESC NULLS LAST, id
       LIMIT $1`,

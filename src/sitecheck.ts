@@ -33,6 +33,10 @@ export const LINKPAGE_UNCHECKED_SQL =
   `(ig_link ~* '(linktr\\.ee|linkin\\.bio|lnk\\.bio|bio\\.link|beacons\\.ai|tap\\.bio|msha\\.ke|solo\\.to|campsite\\.bio|linkr\\.bio|taplink\\.cc|hoo\\.be|allmylinks\\.com|direct\\.me|linkpop\\.com|linkfly\\.to|bit\\.ly|tinyurl\\.com|carrd\\.co|stan\\.store|sites\\.google\\.com)'
     AND linkpage_checked_at IS NULL)`;
 
+/* Trades Gregg doesn't sell to (2026-10-18: "I don't care about hair salons"). Kept in the database,
+   left out of every outreach queue. */
+export const NOT_EXCLUDED_NICHE_SQL = `COALESCE(niche, '') NOT IN ('hair salon')`;
+
 /* The "No site" Instagram queue (2026-10-18, Gregg: "these leads are hot garbage" — the tab was 5,929
    June Google-Maps rows, only 7 with a handle and none ever opened). A lead qualifies only when we
    LOOKED: Instagram read via Apify, no website in the bio or inside its link page, posting in the last
@@ -40,7 +44,8 @@ export const LINKPAGE_UNCHECKED_SQL =
 export const IG_NO_SITE_SQL =
   `(status = 'new' AND ig_handle IS NOT NULL AND ig_handle <> '' AND ig_checked_at IS NOT NULL
     AND (website IS NULL OR website = '') AND NOT ${LINKPAGE_UNCHECKED_SQL}
-    AND last_active > now() - interval '60 days' AND COALESCE(ig_followers, 0) BETWEEN 80 AND 15000)`;
+    AND last_active > now() - interval '60 days' AND COALESCE(ig_followers, 0) BETWEEN 80 AND 15000
+    AND ${NOT_EXCLUDED_NICHE_SQL})`;
 
 export function classifyLink(url: string | null | undefined): LinkKind {
   if (!url || !url.trim()) return "none";

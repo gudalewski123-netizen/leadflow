@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
-import { syncWebsitesFromBio, IG_NO_SITE_SQL } from "./sitecheck.js";
+import { syncWebsitesFromBio, IG_NO_SITE_SQL, NOT_EXCLUDED_NICHE_SQL } from "./sitecheck.js";
 import { checkLinkPages, ensureLinkpageColumn } from "./linkpage.js";
 import { openerFor, variantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
@@ -133,7 +133,7 @@ app.get("/api/leads", async (req, res) => {
      lately, and silently binning 838 prospects over our own stale scrape is
      worse than showing them. The card shows how old the reading is instead —
      see the stale badge in views/app.html — so the operator can judge it. */
-  else if (status === "hot") conds.push("status='new'", "hot_score >= 60", "(website IS NULL OR website = '')");
+  else if (status === "hot") conds.push("status='new'", "hot_score >= 60", "(website IS NULL OR website = '')", NOT_EXCLUDED_NICHE_SQL);
   // New: few posts but posting recently — see isLikelyNewBusiness() in
   // score.ts. Tagged into hot_why at scoring time.
   else if (status === "new_business") conds.push("status='new'", "hot_why LIKE '%NEW BUSINESS%'");
@@ -198,7 +198,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE status = 'new')::int AS to_contact,
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL})::int AS no_site,
-      COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60 AND (website IS NULL OR website = ''))::int AS hot,
+      COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60 AND (website IS NULL OR website = '') AND ${NOT_EXCLUDED_NICHE_SQL})::int AS hot,
       COUNT(*) FILTER (WHERE status = 'new' AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today

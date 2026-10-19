@@ -151,7 +151,9 @@ app.get("/api/leads", async (req, res) => {
     conds.push(
       "status='sent'",
       "touches < 3",
-      "last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)"
+      "last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)",
+      // a "just checking this reached you" months later reads strange — same 30-day window idea as dmbot's 21
+      "last_touch_at > now() - interval '30 days'"
     );
   else if (status === "sent") conds.push("status='sent'");
   else if (status === "replied") conds.push("status='replied'");
@@ -169,7 +171,10 @@ app.get("/api/leads", async (req, res) => {
   const rows = (await pool.query(
     // hot_score leads the sort: reviews are NULL on ~99% of no-site leads, so
     // ordering by reviews alone was effectively random.
-    status === "no_site"
+    status === "followup"
+      // most overdue first
+      ? `SELECT * FROM leads ${where} ORDER BY last_touch_at ASC NULLS LAST, id LIMIT ${limit} OFFSET ${offset}`
+      : status === "no_site"
       // best prospects first: the hot score (recent posting, business account, believable following, no link
       // at all) then recency; Maps text-only rows after every Instagram lead
       ? `SELECT * FROM leads ${where} ORDER BY (ig_checked_at IS NOT NULL) DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`
@@ -209,6 +214,9 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} AND hot_score >= 60)::int AS hot,
       COUNT(*) FILTER (WHERE ${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
+      COUNT(*) FILTER (WHERE status = 'sent' AND touches < 3
+        AND last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)
+        AND last_touch_at > now() - interval '30 days')::int AS followup_due,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today
     FROM leads
   `);

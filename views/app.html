@@ -77,6 +77,8 @@
           transition:border-color .12s, background .12s }
   .card:hover { border-color:var(--border-2) }
   .card.on { border-color:var(--accent); background:var(--surface-2) }
+  .chip .due { display:inline-block; min-width:18px; padding:0 5px; margin-left:4px; border-radius:9px;
+               background:var(--accent); color:#04120c; font-size:11px; font-weight:800; text-align:center }
   /* back from Instagram: "did you send it?" — one click marks it (2026-10-18) */
   .card.asksent { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft) }
   .sentask { grid-column:2; display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 10px;
@@ -253,7 +255,7 @@
 <script>
 const FILTERS = [
   ["new", "To contact"], ["hot", "Hot"], ["new_business", "New biz"], ["no_site", "No site"], ["no_aeo", "No AEO"], ["bad_site", "Weak site"],
-  ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
+  ["followup", "Follow up"], ["sent", "Sent"], ["replied", "Replied"], ["all", "All"],
 ];
 let pageLeads = [], active = "no_site", stateFilter = "all", nicheFilter = "all", chanFilter = "all", minRev = 0;
 let stats = {}, facets = { regionCounts: {}, nicheCounts: {}, ig: 0, phone: 0 };
@@ -273,7 +275,8 @@ function badge(cls, label) { return `<span class="badge ${cls}">${label}</span>`
 
 function render() {
   $("#filters").innerHTML = FILTERS.map(([k, label]) =>
-    `<button class="chip ${k === active ? "active" : ""}" onclick="setFilter('${k}')">${label}</button>`).join(" ");
+    `<button class="chip ${k === active ? "active" : ""}" onclick="setFilter('${k}')">${label}${
+      k === "followup" && stats.followup_due ? ` <span class="due">${stats.followup_due}</span>` : ""}</button>`).join(" ");
 
   const counter = $("#counter");
   counter.textContent = `${stats.sent_today ?? 0} DMs today`;
@@ -381,6 +384,15 @@ function lastPost(l) {
   return ` · last post ${t}`;
 }
 
+/* On a messaged lead: which message is next and when the last went out — the Follow up tab's cards are
+   touch 2 (day 4) and the last, touch 3 (day 9). Most replies to cold DMs come on 2 or 3. */
+function touchInfo(l) {
+  if (l.status !== "sent" || !l.touches) return "";
+  const d = daysSince(l.last_touch_at);
+  const next = l.touches >= 3 ? "done (3 sent)" : `next: message ${l.touches + 1} of 3`;
+  return ` · <b>${next}</b>${d != null ? ` · last sent ${d === 0 ? "today" : d === 1 ? "yesterday" : d + " days ago"}` : ""}`;
+}
+
 function card(l) {
   /* Only label the categories we have a word for. A category outside this map
      used to render the badge "UNDEFINED" on the card. */
@@ -399,6 +411,7 @@ function card(l) {
       ${esc(l.niche ?? "")} · ${esc(l.area ?? "")}
       ${l.ig_followers ? ` · ${Number(l.ig_followers).toLocaleString()} followers` : ""}
       ${lastPost(l)}
+      ${touchInfo(l)}
       ${l.website ? ` · <a href="${esc(l.website)}" target="_blank" rel="noopener">website</a>` : ""}
       ${l.maps_url ? ` · <a href="${esc(l.maps_url)}" target="_blank" rel="noopener">maps</a>` : ""}
     </div>

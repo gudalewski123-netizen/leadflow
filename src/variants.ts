@@ -129,6 +129,41 @@ export function openerFor(id: number, touches = 0, hasSite = false): string {
   return pick(CLOSERS, id, 0xc2b2);
 }
 
+/* DASHBOARD-ONLY trade-named openers (2026-10-18). Gregg sends these by hand from the "No site" cards.
+   Naming the trade ("your detailing page") reads less like a blast than "your Instagram page".
+   Rule 2 above bans the business NAME (junk display names); the trade comes from `niche`, which every
+   queued lead has passed a name/handle check for (quality.ts), so it is clean. NOT used by dmbot —
+   the bot recognises its own earlier messages by exact text against the static lists above. */
+const TRADE_NOUN: Record<string, string> = {
+  "mobile detailing": "detailing", "auto detailing": "detailing", "pressure washing": "pressure washing",
+  "roofing": "roofing", "landscaping": "landscaping", "lawn care": "lawn care", "handyman": "handyman",
+  "junk removal": "junk removal", "fencing": "fence", "concrete contractor": "concrete", "tree service": "tree service",
+  "painting": "painting", "pool service": "pool service", "window cleaning": "window cleaning",
+  "gutter cleaning": "gutter cleaning", "sealcoating": "sealcoating", "hardscaping": "hardscaping",
+  "masonry": "masonry", "epoxy flooring": "epoxy flooring", "christmas light installation": "Christmas lights",
+};
+export const TRADE_OPENERS: string[] = [
+  "Hi, I hope all is well! I was looking at your {trade} page on Instagram and didn't see a website for the business. I'd love to create you a free demo if you're interested?",
+  "Hey, hope all is well! I came across your {trade} page and didn't see a website linked. I'd love to put together a free demo site for you if you're interested?",
+  "Hi! Hope you're doing well. I was checking out your {trade} page on Instagram and couldn't find a website for the business — I'd be happy to build you a free demo if you're interested.",
+  "Hey, I hope all is well with you! Your {trade} work looks great — I didn't see a website on your Instagram though. If you're interested, I'd love to make you a free demo.",
+  "Hi there, hope all is well! I didn't see a website on your {trade} page. I'd love to create a free demo for you — would you be interested?",
+  "Hey! Hope business is going well. I was on your {trade} page and didn't see a website linked — I'd love to put together a free demo for you if you're interested?",
+];
+/** The card's first message: trade-named when we know the trade and they have no website. */
+export function cardOpener(id: number, touches = 0, hasSite = false, niche?: string | null): string {
+  const noun = TRADE_NOUN[(niche ?? "").toLowerCase()];
+  if (touches <= 0 && !hasSite && noun) return pick(TRADE_OPENERS, id, 0x51ed).replace("{trade}", noun);
+  return openerFor(id, touches, hasSite);
+}
+
+/** Variant tag for a card opener: "t1tv3" = trade-named opener #3 (else the same tags as variantTag). */
+export function cardVariantTag(id: number, touches = 0, hasSite = false, niche?: string | null): string {
+  const noun = TRADE_NOUN[(niche ?? "").toLowerCase()];
+  if (touches <= 0 && !hasSite && noun) return `t1tv${TRADE_OPENERS.indexOf(pick(TRADE_OPENERS, id, 0x51ed))}`;
+  return variantTag(id, touches, hasSite);
+}
+
 /** Which variant went out, for the outreach log. Lets reply rate be read per text. */
 export function variantTag(id: number, touches = 0, hasSite = false): string {
   const list = touches <= 0 ? (hasSite ? SITE_OPENERS : OPENERS) : touches === 1 ? BUMPS : CLOSERS;

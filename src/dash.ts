@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
 import { syncWebsitesFromBio, IG_NO_SITE_SQL, NOT_EXCLUDED_NICHE_SQL } from "./sitecheck.js";
 import { checkLinkPages, ensureLinkpageColumn } from "./linkpage.js";
-import { openerFor, variantTag } from "./variants.js";
+import { cardOpener, cardVariantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
 import { findIgHandle } from "./findig.js";
 import { ALL_STATES } from "./cities.js";
@@ -174,7 +174,7 @@ app.get("/api/leads", async (req, res) => {
      choice is deterministic from (id, touches) anyway — so it is free to
      compute and always consistent with what the follow-up logic will pick
      next. `message` still wins when it holds a real hand-written draft. */
-  for (const r of rows) r.opener = openerFor(r.id, r.touches ?? 0, Boolean(r.website));
+  for (const r of rows) r.opener = cardOpener(r.id, r.touches ?? 0, Boolean(r.website), r.niche);
   res.json({ leads: rows, total });
 });
 
@@ -239,7 +239,9 @@ app.post("/api/leads/:id", async (req, res) => {
          the one input we control. */
       await pool.query(
         "INSERT INTO outreach (lead_id, channel, touch_no, note) VALUES ($1,$2,$3,$4)",
-        [id, (req.body as any).channel ?? "ig", touchNo, variantTag(id, touchNo - 1)]
+        [id, (req.body as any).channel ?? "ig", touchNo,
+         await (async () => { const l = (await pool.query("SELECT niche, website FROM leads WHERE id=$1", [id])).rows[0] ?? {};
+           return cardVariantTag(id, touchNo - 1, Boolean(l.website), l.niche); })()]
       );
     } else {
       await pool.query("UPDATE leads SET status=$1 WHERE id=$2", [status, id]);

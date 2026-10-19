@@ -41,11 +41,15 @@ export const NOT_EXCLUDED_NICHE_SQL = `COALESCE(niche, '') NOT IN ('hair salon')
    June Google-Maps rows, only 7 with a handle and none ever opened). A lead qualifies only when we
    LOOKED: Instagram read via Apify, no website in the bio or inside its link page, posting in the last
    60 days, and a follower count a real local business has. */
-export const IG_NO_SITE_SQL =
-  `(status = 'new' AND ig_handle IS NOT NULL AND ig_handle <> '' AND ig_checked_at IS NOT NULL
+/** minFollowers: 80 for the No-site queue; 0 for New biz, where a 10-follower account that just started IS the
+    prospect (Anderson Roofing, 30 followers, 7 posts — needs a website more than anyone). */
+export function igNoSiteSql(minFollowers = 80): string {
+  return `(status = 'new' AND ig_handle IS NOT NULL AND ig_handle <> '' AND ig_checked_at IS NOT NULL
     AND (website IS NULL OR website = '') AND NOT ${LINKPAGE_UNCHECKED_SQL}
-    AND last_active > now() - interval '60 days' AND COALESCE(ig_followers, 0) BETWEEN 80 AND 15000
+    AND last_active > now() - interval '60 days' AND COALESCE(ig_followers, 0) BETWEEN ${minFollowers} AND 15000
     AND ${NOT_EXCLUDED_NICHE_SQL})`;
+}
+export const IG_NO_SITE_SQL = igNoSiteSql(80);
 
 export function classifyLink(url: string | null | undefined): LinkKind {
   if (!url || !url.trim()) return "none";

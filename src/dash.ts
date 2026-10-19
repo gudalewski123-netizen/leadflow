@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
-import { syncWebsitesFromBio, IG_NO_SITE_SQL, NOT_EXCLUDED_NICHE_SQL } from "./sitecheck.js";
+import { syncWebsitesFromBio, IG_NO_SITE_SQL, igNoSiteSql } from "./sitecheck.js";
 import { checkLinkPages, ensureLinkpageColumn } from "./linkpage.js";
 import { cardOpener, cardVariantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
@@ -112,7 +112,8 @@ app.get("/api/leads", async (req, res) => {
      with a phone and no handle — those are text-only leads, kept out of the Instagram view. The old tab
      was the Maps rows alone; "On Instagram" showed 7 unverified guessed handles. */
   else if (status === "no_site")
-    conds.push(`(${IG_NO_SITE_SQL} OR (status='new' AND category='no_site' AND (ig_handle IS NULL OR ig_handle='') AND phone IS NOT NULL))`);
+    conds.push(`(${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')
+                 OR (status='new' AND category='no_site' AND (ig_handle IS NULL OR ig_handle='') AND phone IS NOT NULL))`);
   else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
   // No AEO: has a website but no schema.org structured data — pitch AI-search visibility
   else if (status === "no_aeo") conds.push("status='new'", "website IS NOT NULL", "has_aeo = false");
@@ -133,10 +134,16 @@ app.get("/api/leads", async (req, res) => {
      lately, and silently binning 838 prospects over our own stale scrape is
      worse than showing them. The card shows how old the reading is instead —
      see the stale badge in views/app.html — so the operator can judge it. */
-  else if (status === "hot") conds.push("status='new'", "hot_score >= 60", "(website IS NULL OR website = '')", NOT_EXCLUDED_NICHE_SQL);
+  /* 2026-10-18: Hot = the best of the VERIFIED No-site queue (IG_NO_SITE_SQL: checked, no website anywhere,
+     posted in 60 days, clean) scoring 60+. The old rule (hot_score alone) showed 349 leads, 204 of them
+     scored "posted this week" months ago and since gone quiet — the stale problem described above, now
+     solved by refreshing (hot:apify --refresh) instead of showing stale readings. */
+  else if (status === "hot") conds.push(IG_NO_SITE_SQL, "hot_score >= 60");
   // New: few posts but posting recently — see isLikelyNewBusiness() in
   // score.ts. Tagged into hot_why at scoring time.
-  else if (status === "new_business") conds.push("status='new'", "hot_why LIKE '%NEW BUSINESS%'");
+  // verified no website + active (no follower floor — a brand-new account is the point); 10-18: the old rule
+  // also listed new businesses that HAVE a website (Right Way Epoxy, Clean Homes WY)
+  else if (status === "new_business") conds.push(igNoSiteSql(0), "hot_why LIKE '%NEW BUSINESS%'");
   // Follow-up due: messaged, never replied, and enough time has passed for
   // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
   // not persistent, you're a nuisance.
@@ -198,9 +205,9 @@ app.get("/api/stats", async (_req, res) => {
     SELECT
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE status = 'new')::int AS to_contact,
-      COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL})::int AS no_site,
-      COUNT(*) FILTER (WHERE status = 'new' AND hot_score >= 60 AND (website IS NULL OR website = '') AND ${NOT_EXCLUDED_NICHE_SQL})::int AS hot,
-      COUNT(*) FILTER (WHERE status = 'new' AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
+      COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))::int AS no_site,
+      COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} AND hot_score >= 60)::int AS hot,
+      COUNT(*) FILTER (WHERE ${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today
     FROM leads

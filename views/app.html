@@ -77,6 +77,11 @@
           transition:border-color .12s, background .12s }
   .card:hover { border-color:var(--border-2) }
   .card.on { border-color:var(--accent); background:var(--surface-2) }
+  /* back from Instagram: "did you send it?" — one click marks it (2026-10-18) */
+  .card.asksent { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft) }
+  .sentask { grid-column:2; display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 10px;
+             border-radius:8px; background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:600 }
+  .sentask button { padding:5px 12px }
 
   .score { grid-row:1 / span 6; width:40px; height:34px; border-radius:7px;
            display:grid; place-items:center; font-size:14px; font-weight:750;
@@ -367,6 +372,15 @@ function staleChip(l) {
   return `<span class="w warn" title="Instagram last checked ${checked} days ago. Last post on record: ${real}. Re-scan before trusting the score.">${checked}d stale</span>`;
 }
 
+/* How long since their LAST POST, counted from today — the "posted this week" chip is what the scorer saw on
+   the day it checked, and it ages (2026-10-18). */
+function lastPost(l) {
+  const d = daysSince(l.last_active);
+  if (d == null) return "";
+  const t = d <= 0 ? "today" : d === 1 ? "yesterday" : d < 14 ? `${d} days ago` : d < 60 ? `${Math.round(d / 7)} weeks ago` : `${Math.round(d / 30)} months ago`;
+  return ` · last post ${t}`;
+}
+
 function card(l) {
   /* Only label the categories we have a word for. A category outside this map
      used to render the badge "UNDEFINED" on the card. */
@@ -384,6 +398,7 @@ function card(l) {
     <div class="meta">
       ${esc(l.niche ?? "")} · ${esc(l.area ?? "")}
       ${l.ig_followers ? ` · ${Number(l.ig_followers).toLocaleString()} followers` : ""}
+      ${lastPost(l)}
       ${l.website ? ` · <a href="${esc(l.website)}" target="_blank" rel="noopener">website</a>` : ""}
       ${l.maps_url ? ` · <a href="${esc(l.maps_url)}" target="_blank" rel="noopener">maps</a>` : ""}
     </div>
@@ -525,8 +540,26 @@ function igDestination(l) {
   return `https://www.google.com/search?q=${q}`;
 }
 
+/* Back from Instagram, the card you just opened asks "Sent it?" — forgetting "Mark sent" meant the lead stayed
+   in the list (a second DM later) and never got its follow-up. */
+let awaitingSent = null;
+function askSent() {
+  const id = awaitingSent; awaitingSent = null;
+  const el = id && document.getElementById(`lead-${id}`);
+  if (!el || el.querySelector(".sentask")) return;
+  el.classList.add("asksent");
+  el.insertAdjacentHTML("beforeend",
+    `<div class="sentask">Sent the DM?
+       <button class="primary" onclick="setStatus(${id}, 'sent')">✓ Sent</button>
+       <button class="ghost" onclick="this.closest('.card').classList.remove('asksent'); this.parentElement.remove()">Not yet</button></div>`);
+  el.scrollIntoView({ block: "nearest" });
+}
+window.addEventListener("focus", () => { if (awaitingSent) setTimeout(askSent, 150); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && awaitingSent) setTimeout(askSent, 150); });
+
 window.copyOpen = async (id, btn) => {
   const l = pageLeads.find((x) => x.id === id);
+  if (l.ig_handle) awaitingSent = id;
 
   // Open the tab FIRST, synchronously inside the click — if we await the copy
   // before opening, the browser no longer sees a user gesture and the popup

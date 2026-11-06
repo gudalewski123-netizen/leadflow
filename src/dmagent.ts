@@ -163,7 +163,11 @@ function startSender() {
   });
 }
 
-async function tick() {
+/* 2026-11-06: check in every 10 s only while something is HAPPENING (sending, connecting); otherwise every 20 min.
+   The old fixed 10 s heartbeat never let Neon's compute sleep (it suspends after 5 quiet minutes): the LeadFlow
+   database was awake 24/7 (~6 CU-hours a day, ~$25/month) while the agent sat "stopped / not connected". */
+const ACTIVE_MS = 10_000, IDLE_MS = 20 * 60_000;
+async function tick(): Promise<number> {
   await pool.query("UPDATE dm_control SET agent_seen_at=now() WHERE id=1");
   const ctl = (await pool.query("SELECT * FROM dm_control WHERE id=1")).rows[0];
 
@@ -171,14 +175,14 @@ async function tick() {
   if (ctl.connect_seq > lastConnectSeq && !busyConnecting) {
     lastConnectSeq = ctl.connect_seq; writeFileSync(STATE, String(lastConnectSeq));
     connect().catch(async (e) => { busyConnecting = false; log("connect failed:", e?.message); await setStatus("not connected", `Couldn't open the login window: ${String(e?.message ?? e).slice(0, 140)}`); });
-    return;
+    return ACTIVE_MS;
   }
-  if (busyConnecting) return;
+  if (busyConnecting) return ACTIVE_MS;
 
   if (ctl.desired !== "running") {
     if (child) { log("stop requested"); child.kill("SIGINT"); }
     if (["sending", "waiting", "done for today"].includes(ctl.status)) await setStatus("stopped", "Paused from the dashboard.");
-    return;
+    return child ? ACTIVE_MS : IDLE_MS;
   }
 
   // desired = running
@@ -188,27 +192,29 @@ async function tick() {
       const why = readFileSync(STOP, "utf8").split("\n")[1] ?? "stopped";
       await pool.query("UPDATE dm_control SET desired='stopped' WHERE id=1");
       await setStatus(/not logged in|redirected to .*login/i.test(why) ? "not connected" : "blocked", why);
-      return;
+      return IDLE_MS;
     }
   }
-  if (child) { if (ctl.status !== "sending") await setStatus("sending", "Sending — spread across the day."); return; }
+  if (child) { if (ctl.status !== "sending") await setStatus("sending", "Sending — spread across the day."); return ACTIVE_MS; }
 
   const h = hourInTZ();
-  if (h < START_HOUR || h >= END_HOUR) { await setStatus("waiting", `Sends between ${START_HOUR}am and ${END_HOUR - 12}pm Eastern. It will start on its own.`); return; }
+  if (h < START_HOUR || h >= END_HOUR) { await setStatus("waiting", `Sends between ${START_HOUR}am and ${END_HOUR - 12}pm Eastern. It will start on its own.`); return IDLE_MS; }
   const b = await budget();
-  if (b.remaining <= 0) { await setStatus("done for today", `${b.today} of ${b.cap} sent today. Picks up again tomorrow at ${START_HOUR}am Eastern.`); return; }
-  if (Date.now() < retryAt) { await setStatus("waiting", `Retrying after an error at ${new Date(retryAt).toLocaleTimeString()}.`); return; }
+  if (b.remaining <= 0) { await setStatus("done for today", `${b.today} of ${b.cap} sent today. Picks up again tomorrow at ${START_HOUR}am Eastern.`); return IDLE_MS; }
+  if (Date.now() < retryAt) { await setStatus("waiting", `Retrying after an error at ${new Date(retryAt).toLocaleTimeString()}.`); return Math.max(ACTIVE_MS, Math.min(IDLE_MS, retryAt - Date.now())); }
 
   startSender();
   await setStatus("sending", "Sending — spread across the day.");
+  return ACTIVE_MS;
 }
 
 async function main() {
   await init();
   log("dmagent up");
   for (;;) {
-    try { await tick(); } catch (e: any) { log("tick error:", e?.message); }
-    await sleep(10_000);
+    let wait = ACTIVE_MS;
+    try { wait = await tick(); } catch (e: any) { log("tick error:", e?.message); wait = 60_000; }
+    await sleep(wait);
   }
 }
 process.on("SIGTERM", () => { child?.kill("SIGINT"); process.exit(0); });

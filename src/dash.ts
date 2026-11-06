@@ -332,7 +332,9 @@ app.get("/api/dm", async (_req, res) => {
     `SELECT COUNT(*)::int n FROM leads WHERE ig_handle IS NOT NULL AND ig_handle <> ''
        AND status='new' AND hot_score >= 60 AND hot_score_orig IS NULL AND (website IS NULL OR website = '')`)).rows[0].n;
   const seen = ctl.agent_seen_at ? Date.now() - new Date(ctl.agent_seen_at).getTime() : null;
-  res.json({ ...ctl, macOnline: seen !== null && seen < 90_000, budget: b, recent, queued });
+  // the Mac agent checks in every 10 s while sending/connecting but every 20 min when idle (2026-11-06, Neon cost) —
+  // "online" = heard from within 25 min, so an idle agent is not shown as offline
+  res.json({ ...ctl, macOnline: seen !== null && seen < 25 * 60_000, budget: b, recent, queued });
 });
 app.post("/api/dm/connect", async (_req, res) => {
   await pool.query("UPDATE dm_control SET connect_seq = connect_seq + 1, updated_at = now() WHERE id=1");

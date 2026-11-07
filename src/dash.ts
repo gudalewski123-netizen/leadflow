@@ -157,7 +157,9 @@ app.get("/api/leads", async (req, res) => {
     );
   else if (status === "sent") conds.push("status='sent'");
   else if (status === "replied") conds.push("status='replied'");
-  else conds.push("status NOT IN ('dead','skip')"); // "all" — hide dead/skipped
+  // "all" — hide dead/skipped, and 'archived' = the no-Instagram leads put away 2026-11-07 (Gregg: texts never hit;
+  // reversible from table lead_status_backup_20261107)
+  else conds.push("status NOT IN ('dead','skip','archived')");
 
   if (region === "__us__") conds.push(`state = ANY(${p(ALL_STATES)})`);
   else if (region !== "all") conds.push(`state = ${p(region)}`);

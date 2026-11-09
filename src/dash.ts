@@ -91,32 +91,20 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
-// Filtered + paginated leads — the dashboard fetches only the page it's showing,
-// so it loads instantly no matter how big the database gets.
-app.get("/api/leads", async (req, res) => {
-  const q = req.query;
-  const status = String(q.status ?? "no_site");
-  const region = String(q.region ?? "all");
-  const niche = String(q.niche ?? "all");
-  const chan = String(q.chan ?? "all");
-  const minrev = parseInt(String(q.minrev ?? "0")) || 0;
-  const limit = Math.min(parseInt(String(q.limit ?? "60")) || 60, 200);
-  const offset = parseInt(String(q.offset ?? "0")) || 0;
-
-  const conds: string[] = [];
-  const params: any[] = [];
-  const p = (v: any) => { params.push(v); return "$" + params.length; };
-
-  if (status === "new") conds.push("status='new'");
-  /* No site = Instagram leads we have VERIFIED have no website (IG_NO_SITE_SQL), plus Google-Maps rows
-     with a phone and no handle — those are text-only leads, kept out of the Instagram view. The old tab
-     was the Maps rows alone; "On Instagram" showed 7 unverified guessed handles. */
+/* Which leads each tab shows. INSTAGRAM ONLY (Gregg 2026-11-09: "only instagram leads") — every tab requires a
+   handle; the Google-Maps text-only rows and the No AEO / Weak site pitches are gone from the site (texts never
+   got a reply; all 6 replies ever came from Instagram). */
+const HAS_IG = "ig_handle IS NOT NULL AND ig_handle <> ''";
+function tabConds(status: string): string[] {
+  const c: string[] = [HAS_IG];
+  if (status === "new") c.push("status='new'");
+  /* No site = Instagram leads we have VERIFIED have no website (IG_NO_SITE_SQL) + verified new businesses.
+     (Until 2026-11-09 it also listed Google-Maps rows with a phone and no handle — text-only leads.) */
   else if (status === "no_site")
-    conds.push(`(${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')
-                 OR (status='new' AND category='no_site' AND (ig_handle IS NULL OR ig_handle='') AND phone IS NOT NULL))`);
-  else if (status === "bad_site") conds.push("status='new'", "category='bad_site'");
+    c.push(`(${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))`);
+  else if (status === "bad_site") c.push("status='new'", "category='bad_site'");
   // No AEO: has a website but no schema.org structured data — pitch AI-search visibility
-  else if (status === "no_aeo") conds.push("status='new'", "website IS NOT NULL", "has_aeo = false");
+  else if (status === "no_aeo") c.push("status='new'", "website IS NOT NULL", "has_aeo = false");
   /* Hot: scored by src/hot.ts from live Instagram data — recently posting AND
      no real website in bio. The best prospects we can identify.
 
@@ -138,34 +126,49 @@ app.get("/api/leads", async (req, res) => {
      posted in 60 days, clean) scoring 60+. The old rule (hot_score alone) showed 349 leads, 204 of them
      scored "posted this week" months ago and since gone quiet — the stale problem described above, now
      solved by refreshing (hot:apify --refresh) instead of showing stale readings. */
-  else if (status === "hot") conds.push(IG_NO_SITE_SQL, "hot_score >= 60");
+  else if (status === "hot") c.push(IG_NO_SITE_SQL, "hot_score >= 60");
   // New: few posts but posting recently — see isLikelyNewBusiness() in
   // score.ts. Tagged into hot_why at scoring time.
   // verified no website + active (no follower floor — a brand-new account is the point); 10-18: the old rule
   // also listed new businesses that HAVE a website (Right Way Epoxy, Clean Homes WY)
-  else if (status === "new_business") conds.push(igNoSiteSql(0), "hot_why LIKE '%NEW BUSINESS%'");
+  else if (status === "new_business") c.push(igNoSiteSql(0), "hot_why LIKE '%NEW BUSINESS%'");
   // Follow-up due: messaged, never replied, and enough time has passed for
   // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
   // not persistent, you're a nuisance.
   else if (status === "followup")
-    conds.push(
+    c.push(
       "status='sent'",
       "touches < 3",
       "last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)",
       // a "just checking this reached you" months later reads strange — same 30-day window idea as dmbot's 21
       "last_touch_at > now() - interval '30 days'"
     );
-  else if (status === "sent") conds.push("status='sent'");
-  else if (status === "replied") conds.push("status='replied'");
+  else if (status === "sent") c.push("status='sent'");
+  else if (status === "replied") c.push("status='replied'");
   // "all" — hide dead/skipped, and 'archived' = the no-Instagram leads put away 2026-11-07 (Gregg: texts never hit;
   // reversible from table lead_status_backup_20261107)
-  else conds.push("status NOT IN ('dead','skip','archived')");
+  else c.push("status NOT IN ('dead','skip','archived')");
+  return c;
+}
 
+// Filtered + paginated leads — the dashboard fetches only the page it's showing,
+// so it loads instantly no matter how big the database gets.
+app.get("/api/leads", async (req, res) => {
+  const q = req.query;
+  const status = String(q.status ?? "no_site");
+  const region = String(q.region ?? "all");
+  const niche = String(q.niche ?? "all");
+  const minrev = parseInt(String(q.minrev ?? "0")) || 0;
+  const limit = Math.min(parseInt(String(q.limit ?? "60")) || 60, 200);
+  const offset = parseInt(String(q.offset ?? "0")) || 0;
+
+  const conds: string[] = [];
+  const params: any[] = [];
+  const p = (v: any) => { params.push(v); return "$" + params.length; };
+  conds.push(...tabConds(status));
   if (region === "__us__") conds.push(`state = ANY(${p(ALL_STATES)})`);
   else if (region !== "all") conds.push(`state = ${p(region)}`);
   if (niche !== "all") conds.push(`niche = ${p(niche)}`);
-  if (chan === "ig") conds.push("ig_handle IS NOT NULL");
-  else if (chan === "phone") conds.push("ig_handle IS NULL AND phone IS NOT NULL");
   if (minrev > 0) conds.push(`COALESCE(reviews,0) >= ${p(minrev)}`);
 
   const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
@@ -192,19 +195,18 @@ app.get("/api/leads", async (req, res) => {
   res.json({ leads: rows, total });
 });
 
-// Dropdown counts (per-region, per-niche, channel) over the to-contact pool —
-// computed in SQL so the client never needs the full lead list.
-app.get("/api/facets", async (_req, res) => {
-  const [states, niches, chan] = await Promise.all([
-    pool.query("SELECT state, COUNT(*)::int n FROM leads WHERE status='new' AND state IS NOT NULL GROUP BY state"),
-    pool.query("SELECT niche, COUNT(*)::int n FROM leads WHERE status='new' AND niche IS NOT NULL GROUP BY niche"),
-    pool.query("SELECT COUNT(*) FILTER (WHERE ig_handle IS NOT NULL)::int ig, COUNT(*) FILTER (WHERE ig_handle IS NULL AND phone IS NOT NULL)::int phone FROM leads WHERE status='new'"),
+// Dropdown counts (trade, state) for the tab being viewed, so every number in a dropdown matches the list.
+app.get("/api/facets", async (req, res) => {
+  const where = "WHERE " + tabConds(String(req.query.status ?? "no_site")).join(" AND ");
+  const [states, niches] = await Promise.all([
+    pool.query(`SELECT state, COUNT(*)::int n FROM leads ${where} AND state IS NOT NULL GROUP BY state`),
+    pool.query(`SELECT niche, COUNT(*)::int n FROM leads ${where} AND niche IS NOT NULL GROUP BY niche`),
   ]);
   const regionCounts: Record<string, number> = {};
   for (const r of states.rows) regionCounts[r.state] = r.n;
   const nicheCounts: Record<string, number> = {};
   for (const r of niches.rows) nicheCounts[r.niche] = r.n;
-  res.json({ regionCounts, nicheCounts, ig: chan.rows[0].ig, phone: chan.rows[0].phone });
+  res.json({ regionCounts, nicheCounts });
 });
 
 app.get("/api/stats", async (_req, res) => {
@@ -219,8 +221,9 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*) FILTER (WHERE status = 'sent' AND touches < 3
         AND last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)
         AND last_touch_at > now() - interval '30 days')::int AS followup_due,
+      COUNT(*) FILTER (WHERE status = 'sent')::int AS sent,
       COUNT(*) FILTER (WHERE contacted_at >= date_trunc('day', now()))::int AS sent_today
-    FROM leads
+    FROM leads WHERE ${HAS_IG}
   `);
   res.json(rows[0]);
 });

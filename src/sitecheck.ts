@@ -50,6 +50,9 @@ export function igNoSiteSql(minFollowers = 80): string {
     AND ${NOT_EXCLUDED_NICHE_SQL})`;
 }
 export const IG_NO_SITE_SQL = igNoSiteSql(80);
+/** Who may be messaged: exactly the site's "No website" list (verified no website, posted in 60 days, clean) plus
+    verified new businesses. The DM bot and the sender panel both use this (2026-11-09). */
+export const SENDABLE_SQL = `(${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))`;
 
 export function classifyLink(url: string | null | undefined): LinkKind {
   if (!url || !url.trim()) return "none";

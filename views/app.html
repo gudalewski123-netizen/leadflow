@@ -437,7 +437,7 @@ document.addEventListener("keydown", (e) => {
     $id("dm-sub").innerHTML = !d.macOnline ? "Your Mac is offline — wake it up to send."
       : d.detail ? esc(d.detail)
       : !d.account ? "Connect an Instagram account to send DMs automatically."
-      : `Sending from <b style="display:inline">@${esc(String(d.account).replace(/^@/, ""))}</b> · ${num(d.queued)} hot leads in the queue` +
+      : `Sending from <b style="display:inline">@${esc(String(d.account).replace(/^@/, ""))}</b> · ${num(d.queued)} leads in the queue` +
         (last1 ? ` · last: @${esc(last1.ig_handle)}` : "");
     const running = d.desired === "running";
     $id("dm-start").disabled = !d.account || d.status === "connecting";

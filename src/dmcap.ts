@@ -13,7 +13,11 @@
  */
 import { pool } from "./db.js";
 
-export const HARD_CAP = Math.max(1, Number(process.env.DM_DAILY_CAP ?? 60));
+/* 2026-11-09, Gregg: "lets do 150 DMs a day" — he has sent ~100/day by hand for weeks without trouble, so the
+   bot starts at that proven 100 and moves to 150 from its 3rd sending day (counted from the first bot send on or
+   after RAMP_FROM). The old 20 → 40 → 60 ramp was for an account going from a handful to 60. */
+export const HARD_CAP = Math.max(1, Number(process.env.DM_DAILY_CAP ?? 150));
+export const RAMP_FROM = process.env.DM_RAMP_FROM ?? "2026-11-09";
 export const WARMUP = process.env.DM_WARMUP !== "0";
 export const TZ = "America/New_York"; // the leads are US businesses; their day, not ours
 
@@ -21,7 +25,7 @@ export const TZ = "America/New_York"; // the leads are US businesses; their day,
 export function capFor(firstBotSend: Date | null, now = new Date()): number {
   if (!WARMUP) return HARD_CAP;
   const days = firstBotSend ? Math.floor((now.getTime() - firstBotSend.getTime()) / 86_400_000) : 0;
-  const step = days < 3 ? 20 : days < 6 ? 40 : 60;
+  const step = days < 2 ? 100 : 150;
   return Math.min(HARD_CAP, step);
 }
 
@@ -31,9 +35,9 @@ export async function budget() {
        COUNT(*) FILTER (WHERE channel='ig'
          AND sent_at >= (date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1))::int AS today,
        COUNT(*) FILTER (WHERE channel='ig' AND sent_at >= now() - interval '1 hour')::int AS last_hour,
-       MIN(sent_at) FILTER (WHERE note LIKE '%dmbot%') AS first_bot_send
+       MIN(sent_at) FILTER (WHERE note LIKE '%dmbot%' AND sent_at >= $2::date) AS first_bot_send
      FROM outreach`,
-    [TZ]
+    [TZ, RAMP_FROM]
   );
   const r = rows[0];
   const cap = capFor(r.first_bot_send ? new Date(r.first_bot_send) : null);

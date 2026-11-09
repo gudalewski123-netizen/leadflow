@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
-import { syncWebsitesFromBio, IG_NO_SITE_SQL, igNoSiteSql } from "./sitecheck.js";
+import { syncWebsitesFromBio, IG_NO_SITE_SQL, igNoSiteSql, SENDABLE_SQL } from "./sitecheck.js";
 import { checkLinkPages, ensureLinkpageColumn } from "./linkpage.js";
 import { cardOpener, cardVariantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
@@ -334,8 +334,7 @@ app.get("/api/dm", async (_req, res) => {
     `SELECT l.ig_handle, o.touch_no, o.sent_at FROM outreach o JOIN leads l ON l.id=o.lead_id
       WHERE o.note LIKE '%dmbot%' ORDER BY o.sent_at DESC LIMIT 8`)).rows;
   const queued = (await pool.query(
-    `SELECT COUNT(*)::int n FROM leads WHERE ig_handle IS NOT NULL AND ig_handle <> ''
-       AND status='new' AND hot_score >= 60 AND hot_score_orig IS NULL AND (website IS NULL OR website = '')`)).rows[0].n;
+    `SELECT COUNT(*)::int n FROM leads WHERE ${SENDABLE_SQL}`)).rows[0].n;
   const seen = ctl.agent_seen_at ? Date.now() - new Date(ctl.agent_seen_at).getTime() : null;
   // the Mac agent checks in every 10 s while sending/connecting but every 20 min when idle (2026-11-06, Neon cost) —
   // "online" = heard from within 25 min, so an idle agent is not shown as offline

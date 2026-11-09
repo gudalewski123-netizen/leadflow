@@ -84,8 +84,10 @@ async function hunt(query: string): Promise<any[] | null> {
     const datasetId = runData?.defaultDatasetId;
     if (!runId || !datasetId) return null;
 
-    // Poll for terminal state. Runs typically finish in 1-3 min.
-    for (let i = 0; i < 90; i++) {
+    // Poll for terminal state. Runs usually finish in 1-3 min, but on 2026-11-09 they took 3-5+ min and the old
+    // 7.5-min limit walked away from runs that Apify kept running AND billing — paid-for results thrown away.
+    // Now: wait up to 15 min, then ABORT the run (stops the meter) and keep whatever it already found.
+    for (let i = 0; i < 180; i++) {
       await new Promise((r) => setTimeout(r, 5000));
       const st = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${TOKEN}`);
       if (!st.ok) continue;
@@ -100,8 +102,11 @@ async function hunt(query: string): Promise<any[] | null> {
         return null;
       }
     }
-    console.error(`  run never finished on "${query}"`);
-    return null;
+    console.error(`  run still going after 15 min on "${query}" — aborting it, keeping what it found`);
+    await fetch(`https://api.apify.com/v2/actor-runs/${runId}/abort?token=${TOKEN}`, { method: "POST" }).catch(() => {});
+    const part = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${TOKEN}&clean=true`).catch(() => null);
+    const items = part && part.ok ? ((await part.json()) as any[]) : [];
+    return items.length ? items : null;   // nothing found → not recorded as searched, so it is retried later
   } catch (e: any) {
     console.error(`  error on "${query}": ${e?.message}`);
     return null;

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>LeadFlow</title>
-<meta name="color-scheme" content="light dark" />
+<meta name="color-scheme" content="light" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -13,8 +13,6 @@
      "I want it to look like this"). Same tokens as tradestack-forms/public/leads.html. */
   :root { --bg:#f4f4f8; --card:#fff; --ink:#15131f; --muted:#5d5a6d; --faint:#9a97a8; --line:#e6e4ee; --chip:#efedf5;
           --brand:#7C3AED; --brandbg:#f1eafe; --ok:#15803d; --okbg:#dcfce7; --warn:#a16207; --warnbg:#fef3c7; --bad:#b91c1c; --badbg:#fee2e2; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0c0b1d; --card:#161428; --ink:#f4f3fa; --muted:#a9a6bb; --faint:#6f6c82; --line:#2a2742; --chip:#221f38;
-          --brand:#a78bfa; --brandbg:#2a2050; --ok:#4ade80; --okbg:#14361f; --warn:#fbbf24; --warnbg:#3a2e0b; --bad:#f87171; --badbg:#3b1414; } }
   * { box-sizing:border-box }
   [hidden] { display:none !important }
   html { -webkit-text-size-adjust:100% }
@@ -96,6 +94,20 @@
   .toast { position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translate(-50%, 16px); opacity:0; pointer-events:none; z-index:40;
     background:var(--ink); color:var(--card); padding:11px 16px; border-radius:12px; font-size:14px; font-weight:550; transition:opacity .2s, transform .2s; max-width:calc(100vw - 32px) }
   .toast.show { opacity:1; transform:translate(-50%, 0) }
+
+  /* Wide screens: use the sides (Gregg 2026-11-09). Numbers + sender on the left (sticky), leads two across. */
+  @media (min-width:1100px) {
+    .wrap { max-width:1440px; padding-left:32px; padding-right:32px }
+    .layout { display:grid; grid-template-columns:360px minmax(0, 1fr); gap:24px; align-items:start }
+    .side { position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto; scrollbar-width:none }
+    .side::-webkit-scrollbar { display:none }
+    .side .alertbar { flex-direction:column; align-items:stretch } .side .alertbar .btns { width:100% } .side .alertbar .btns button { flex:1 }
+    .side .stats { grid-template-columns:repeat(3, minmax(0, 1fr)) } .side .stat .n { font-size:24px } .side .stat { padding:12px }
+    #list { display:grid; grid-template-columns:repeat(auto-fill, minmax(440px, 1fr)); gap:14px; align-items:start }
+    #list .card { margin:0 } #list .more, #list .empty { grid-column:1 / -1 }
+    .content .tools select { max-width:260px }
+    .keys { text-align:left }
+  }
   @media (max-width:560px) {
     .alertbar { flex-wrap:wrap } .alertbar .btns { width:100% } .alertbar .btns button { flex:1 }
     .stat .n { font-size:24px } .stat { padding:12px }
@@ -110,6 +122,7 @@
     <div class="me"><span id="today"></span><br><button class="ghost" onclick="logout()">Sign out</button></div>
   </header>
 
+  <div class="layout"><aside class="side">
   <section class="alertbar" id="dm-bar" aria-label="Auto-sender">
     <div><b><span class="dot" id="dm-dot"></span>Auto-sender <span id="dm-status"></span></b><span class="sub" id="dm-sub">Checking…</span></div>
     <div class="btns">
@@ -121,6 +134,7 @@
 
   <div class="stats" id="stats"></div>
   <section class="card" id="where"></section>
+  </aside><section class="content">
 
   <nav class="chips" id="tabs" aria-label="Lists"></nav>
   <div class="tools">
@@ -129,6 +143,7 @@
   </div>
   <div class="count" id="sub"></div>
   <main id="list"></main>
+  </section></div>
   <div class="keys" aria-hidden="true"><kbd>J</kbd>/<kbd>K</kbd> move · <kbd>C</kbd> copy &amp; open · <kbd>S</kbd> sent · <kbd>R</kbd> replied · <kbd>X</kbd> skip</div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

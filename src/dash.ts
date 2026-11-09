@@ -182,8 +182,13 @@ app.get("/api/leads", async (req, res) => {
       : status === "no_site"
       // best prospects first: the hot score (recent posting, business account, believable following, no link
       // at all) then recency; Maps text-only rows after every Instagram lead
-      ? `SELECT * FROM leads ${where} ORDER BY (ig_checked_at IS NOT NULL) DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`
-      : `SELECT * FROM leads ${where} ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
+      // 2026-11-09 (Gregg: "I want all types of leads"): trades take turns down the list — each trade's best,
+      // then each trade's second best… — so one cheap-to-find trade (detailing) can't fill the top of the page.
+      // With a trade filter on, the partition is that one trade and the order is plain best-first.
+      ? `SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY COALESCE(niche, '') ORDER BY (ig_checked_at IS NOT NULL) DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC) AS turn
+           FROM leads ${where}) t ORDER BY turn, (ig_checked_at IS NOT NULL) DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`
+      : `SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY COALESCE(niche, '') ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC) AS turn
+           FROM leads ${where}) t ORDER BY turn, hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
     params
   )).rows;
   /* Attach the varied opener here rather than storing it. Writing a variant

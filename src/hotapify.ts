@@ -37,7 +37,9 @@ const ACTOR = "apify~instagram-scraper";
 
 /** One Apify run per batch of handles. resultsType "details" is what carries
  *  latestPosts — without it the profile comes back with no timestamps at all. */
-async function fetchBatch(handles: string[]): Promise<any[]> {
+async function fetchBatch(handles: string[]): Promise<any[] | null> {
+  // null = the call itself failed (Apify dropped the connection — "other side closed", 2026-11-09). The caller must
+  // NOT treat that as "these accounts are gone", or 15 live leads get stamped as deleted.
   const r = await fetch(
     `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${TOKEN}`,
     {
@@ -50,12 +52,13 @@ async function fetchBatch(handles: string[]): Promise<any[]> {
         addParentData: false,
       }),
     }
-  );
+  ).catch((e) => { console.error(`  Apify call failed: ${e?.message ?? e} — batch skipped, will be retried next run`); return null; });
+  if (!r) return null;
   if (!r.ok) {
     console.error(`  Apify run failed: HTTP ${r.status} ${(await r.text()).slice(0, 160)}`);
-    return [];
+    return null;
   }
-  return (await r.json()) as any[];
+  return ((await r.json().catch(() => null)) as any[] | null);
 }
 
 function toProfile(it: any): Profile {
@@ -138,6 +141,7 @@ let scored = 0, hot = 0;
 for (let i = 0; i < leads.length; i += BATCH) {
   const chunk = leads.slice(i, i + BATCH);
   const items = await fetchBatch(chunk.map((l) => l.ig_handle));
+  if (items === null) continue;   // failed call: leave these leads exactly as they were
   const seen = new Set<number>();
 
   for (const it of items) {

@@ -130,6 +130,8 @@ export function isRelevant(
  */
 export const SEARCH_TERM: Record<string, string> = {
   "painting": "painting contractor",
+  // 2026-11-09: "auto" matched car brands and foreign dealers (pagani, BYD Brasil, auto-écoles) — 18% of paid results thrown out
+  "auto detailing": "detailing",
   "concrete contractor": "concrete contractor",
   "roofing": "roofing contractor",
   "landscaping": "landscaping company",

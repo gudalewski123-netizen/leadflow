@@ -96,9 +96,22 @@ await pool.query(`
    recently active first — the "No site" queue was ranking on posting dates from August. Un-scored
    handles are the default mode, as before. */
 const REFRESH = process.argv.includes("--refresh");
+/* --revive (2026-11-09, Gregg: "we need more"): verified no-website leads with a real following that are kept
+   out of the No website list ONLY because their last post was 60+ days ago — on a reading that is itself weeks
+   old. Re-reading one costs ~0.2¢ vs ~3.5¢ to hunt a new ready lead; the ones posting again re-enter the list.
+   Most recently active first (likeliest to have resumed). */
+const REVIVE = process.argv.includes("--revive");
 const leads = (
   await pool.query(
-    REFRESH
+    REVIVE
+      ? `SELECT id, ig_handle FROM leads
+          WHERE ig_handle IS NOT NULL AND ig_handle <> '' AND status='new' AND ig_checked_at < now() - interval '14 days'
+            AND (website IS NULL OR website = '') AND COALESCE(ig_followers, 0) BETWEEN 80 AND 15000
+            AND (last_active IS NULL OR last_active <= now() - interval '60 days')
+            AND COALESCE(niche, '') <> 'hair salon'
+          ORDER BY last_active DESC NULLS LAST
+          LIMIT $1`
+      : REFRESH
       ? `SELECT id, ig_handle FROM leads
           WHERE ig_handle IS NOT NULL AND ig_handle <> '' AND status='new' AND ig_checked_at < now() - interval '3 days'
             AND (website IS NULL OR website = '')

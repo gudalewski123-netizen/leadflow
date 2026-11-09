@@ -109,7 +109,7 @@ const leads = (
     REVIVE
       ? `SELECT id, ig_handle FROM leads
           WHERE ig_handle IS NOT NULL AND ig_handle <> '' AND status='new' AND ig_checked_at < now() - interval '14 days'
-            AND (website IS NULL OR website = '') AND COALESCE(ig_followers, 0) BETWEEN 80 AND 15000
+            AND (website IS NULL OR website = '') AND COALESCE(ig_followers, 0) BETWEEN 30 AND 15000
             AND (last_active IS NULL OR last_active <= now() - interval '60 days')
             AND COALESCE(niche, '') <> 'hair salon'
           ORDER BY last_active DESC NULLS LAST

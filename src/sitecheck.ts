@@ -41,15 +41,15 @@ export const NOT_EXCLUDED_NICHE_SQL = `COALESCE(niche, '') NOT IN ('hair salon')
    June Google-Maps rows, only 7 with a handle and none ever opened). A lead qualifies only when we
    LOOKED: Instagram read via Apify, no website in the bio or inside its link page, posting in the last
    60 days, and a follower count a real local business has. */
-/** minFollowers: 80 for the No-site queue; 0 for New biz, where a 10-follower account that just started IS the
+/** minFollowers: 30 for the No-site queue (80 until 11-09); 0 for New biz, where a 10-follower account that just started IS the
     prospect (Anderson Roofing, 30 followers, 7 posts — needs a website more than anyone). */
-export function igNoSiteSql(minFollowers = 80): string {
+export function igNoSiteSql(minFollowers = 30): string {
   return `(status = 'new' AND ig_handle IS NOT NULL AND ig_handle <> '' AND ig_checked_at IS NOT NULL
     AND (website IS NULL OR website = '') AND NOT ${LINKPAGE_UNCHECKED_SQL}
     AND last_active > now() - interval '60 days' AND COALESCE(ig_followers, 0) BETWEEN ${minFollowers} AND 15000
     AND ${NOT_EXCLUDED_NICHE_SQL})`;
 }
-export const IG_NO_SITE_SQL = igNoSiteSql(80);
+export const IG_NO_SITE_SQL = igNoSiteSql(30);   // 80 until 2026-11-09 — Gregg: "no websites, posted in the last month or two, that's it"; 30-79 followers were real small businesses on review
 /** Who may be messaged: exactly the site's "No website" list (verified no website, posted in 60 days, clean) plus
     verified new businesses. The DM bot and the sender panel both use this (2026-11-09). */
 export const SENDABLE_SQL = `(${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))`;

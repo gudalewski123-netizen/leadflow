@@ -27,7 +27,7 @@ export const CONTRACTOR = /(construction|renovation|remodel|contractor|drywall|c
     monopolies or chains or just famous people") */
 export const CHAIN_BIO = /(\b\d{1,3}\+?\s+(locations|branches|offices|stores)\b|\bnationwide\b|\bfranchis(e|es|ing|ee)\b|\bcorporate\s+(office|headquarters|hq)\b|\bheadquartered\b|\b(across|throughout)\s+(the\s+)?(us|usa|u\.s\.|country|nation|america)\b|\ball\s+50\s+states\b|\bnational\s+(leader|brand|company)\b|\bnyse\b|\bnasdaq\b|\bfortune\s+500\b|\bnow\s+in\s+\d+\s+(states|cities)\b|\bfind\s+a\s+location\b|\blocations?\s+near\s+you\b)/i;
 /** Indian state vehicle codes / regions that slipped through as "plumbing" (sandhu_plumbing_pb05) */
-export const FOREIGN_HANDLE = /(^|[._])(pb|hr|dl|up|mh|rj|gj)\d{2}($|[._])|(^|[._])ltd($|[._])|sanitary|santexnika|elektrika|fortunetown|nettoyage|r[ée]novation\s+cuir|\bfolie\b|ochrona|lakieru|cuidado|mantenimiento|setapak|sijangkang|selangor|kuala|malaysia|\.fr$|jaat|sirsa|chopta|punjab|haryana|ludhiana|amritsar|jalandhar|chandigarh|mumbai|delhi|lahore|karachi|nigeria|lagos|ghana|kenya|philippines|manila|jamaica|kingston\s?ja/i;
+export const FOREIGN_HANDLE = /(^|[._])(pb|hr|dl|up|mh|rj|gj)\d{2}($|[._])|(^|[._])ltd($|[._])|sanitary|santexnika|elektrika|fortunetown|nettoyage|r[ée]novation\s+cuir|\bfolie\b|ochrona|lakieru|cuidado|mantenimiento|setapak|sijangkang|selangor|kuala|malaysia|\.fr$|jaat|sirsa|chopta|punjab|haryana|ludhiana|amritsar|jalandhar|chandigarh|mumbai|delhi|lahore|karachi|nigeria|lagos|ghana|kenya|philippines|manila|jamaica|kingston\s?ja|\.in$|nuevo\s?laredo|[İıŞşĞğ]/i;   // 11-09: .in handle, Mexico border town, Turkish letters
 
 /** above this they were bands, YouTubers, influencers — not a local trade */
 export const MAX_LOCAL_FOLLOWERS = 15000;

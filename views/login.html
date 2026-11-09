@@ -18,18 +18,34 @@
   input:focus { border-color:var(--brand); box-shadow:0 0 0 3px var(--brandbg) }
   button { width:100%; margin-top:12px; font:inherit; font-weight:600; border:0; border-radius:10px; padding:12px 16px; cursor:pointer; background:var(--ink); color:var(--card) }
   .err { color:var(--bad); font-size:14px; min-height:20px; margin-top:10px }
+  .lang { display:flex; justify-content:center; gap:4px; margin-top:14px }
+  .lang a { font-size:13px; color:var(--muted); padding:4px 8px; border-radius:999px; cursor:pointer; text-decoration:none }
+  .lang a.on { color:var(--ink); font-weight:600; background:var(--line) }
 </style>
 </head>
 <body>
   <form class="panel" id="form">
     <div class="mark">L</div><h1>LeadFlow</h1>
-    <p class="sub">Your Instagram leads</p>
-    <label for="pw">Access password</label>
+    <p class="sub" id="t-sub">Your Instagram leads</p>
+    <label for="pw" id="t-pw">Access password</label>
     <input id="pw" type="password" autocomplete="current-password" autofocus required />
-    <button type="submit">Sign in</button>
+    <button type="submit" id="t-btn">Sign in</button>
     <div class="err" id="err"></div>
+    <div class="lang"><a id="l-en" onclick="setLang('en')">English</a><a id="l-es" onclick="setLang('es')">Español</a></div>
   </form>
 <script>
+/* English / Español — same choice as the leads page (localStorage lf_lang) */
+const L = { en: { sub: "Your Instagram leads", pw: "Access password", btn: "Sign in", fast: "Too fast — try again in a second.", wrong: "Wrong password." },
+            es: { sub: "Tus leads de Instagram", pw: "Contraseña de acceso", btn: "Entrar", fast: "Muy rápido — inténtalo de nuevo en un segundo.", wrong: "Contraseña incorrecta." } };
+let lang = (() => { try { return localStorage.getItem("lf_lang") === "es" ? "es" : "en"; } catch { return "en"; } })();
+function setLang(l) {
+  lang = l; try { localStorage.setItem("lf_lang", l); } catch {}
+  document.documentElement.lang = l;
+  for (const k of ["sub", "pw", "btn"]) document.getElementById("t-" + k).textContent = L[l][k];
+  document.getElementById("l-en").className = l === "en" ? "on" : ""; document.getElementById("l-es").className = l === "es" ? "on" : "";
+  document.getElementById("err").textContent = "";
+}
+setLang(lang);
 document.getElementById("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const err = document.getElementById("err");
@@ -40,7 +56,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     body: JSON.stringify({ password: document.getElementById("pw").value }),
   });
   if (r.ok) location.reload();
-  else err.textContent = r.status === 429 ? "Too fast — try again in a second." : "Wrong password.";
+  else err.textContent = r.status === 429 ? L[lang].fast : L[lang].wrong;
 });
 </script>
 </body>

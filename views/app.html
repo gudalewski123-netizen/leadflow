@@ -23,6 +23,11 @@
   .mark { width:36px; height:36px; border-radius:9px; background:var(--brand); color:#fff; display:grid; place-items:center; font-weight:700; font-size:19px; flex:none }
   .brand h1 { font-size:22px; margin:0; white-space:nowrap; letter-spacing:-.01em }
   .me { font-size:13px; color:var(--muted); text-align:right; line-height:1.6 }
+  /* English / Español (2026-11-09): the page in Spanish for a Spanish-speaking helper — the DM itself stays English */
+  .lang { display:flex; width:fit-content; margin:0 0 6px auto; background:var(--chip); border-radius:999px; padding:3px }
+  .lang button { background:transparent; color:var(--muted); border:0; border-radius:999px; padding:5px 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer }
+  .lang button.on { background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(21,19,31,.12) }
+  .msgnote { display:block; font-size:12px; color:var(--muted); margin-top:4px }
   button, .btn { font:inherit; border:0; border-radius:10px; padding:10px 16px; font-weight:600; cursor:pointer; background:var(--ink); color:var(--card); text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap }
   button:disabled { opacity:.5; cursor:not-allowed }
   button.ghost { background:transparent; color:var(--muted); padding:4px 0; font-weight:500; text-decoration:underline }
@@ -119,12 +124,14 @@
 <div class="wrap">
   <header>
     <a class="brand" href="/"><span class="mark">L</span><h1>LeadFlow</h1></a>
-    <div class="me"><span id="today"></span><br><button class="ghost" onclick="logout()">Sign out</button></div>
+    <div class="me">
+      <div class="lang" role="group" aria-label="Language"><button id="lang-en" onclick="setLang('en')">English</button><button id="lang-es" onclick="setLang('es')">Español</button></div>
+      <span id="today"></span><br><button class="ghost" id="signout" onclick="logout()">Sign out</button></div>
   </header>
 
   <div class="layout"><aside class="side">
   <section class="alertbar" id="dm-bar" aria-label="Auto-sender">
-    <div><b><span class="dot" id="dm-dot"></span>Auto-sender <span id="dm-status"></span></b><span class="sub" id="dm-sub">Checking…</span></div>
+    <div><b><span class="dot" id="dm-dot"></span><span id="dm-title">Auto-sender</span> <span id="dm-status"></span></b><span class="sub" id="dm-sub">Checking…</span></div>
     <div class="btns">
       <button class="soft" id="dm-connect" hidden>Connect Instagram</button>
       <button class="brandbtn" id="dm-start">Start</button>
@@ -144,20 +151,126 @@
   <div class="count" id="sub"></div>
   <main id="list"></main>
   </section></div>
-  <div class="keys" aria-hidden="true"><kbd>J</kbd>/<kbd>K</kbd> move · <kbd>C</kbd> copy &amp; open · <kbd>S</kbd> sent · <kbd>R</kbd> replied · <kbd>X</kbd> skip</div>
+  <div class="keys" id="keys" aria-hidden="true"></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const TABS = [
-  ["hot", "Hot", "hot", "The best of them: no website, posting lately, a real following."],
-  ["no_site", "No website", "no_site", "Businesses with no website, posting in the last 60 days."],
-  ["new_business", "New", "new_business", "Young accounts with no website yet — just getting started."],
-  ["followup", "Follow up", "followup_due", "Messaged, no reply yet, and due their next message."],
-  ["sent", "Sent", "sent", "Everyone you've messaged."],
-  ["replied", "Replied", "replied", "They wrote back."],
-];
-const TRADE_LABEL = (n) => n ? n.replace(/\b\w/g, (c) => c.toUpperCase()) : "";
+/* ---------- language (2026-11-09, Gregg: a Spanish-speaking helper uses the page in Spanish, but the message they
+   copy and send stays in English). Only the page changes — msgFor() is never translated. Remembered per device. */
+const STR = {
+  en: {
+    signout: "Sign out", today: (s, c) => `${s} of ${c} DMs today`,
+    tabs: { hot: ["Hot", "The best of them: no website, posting lately, a real following."],
+      no_site: ["No website", "Businesses with no website, posting in the last 60 days."],
+      new_business: ["New", "Young accounts with no website yet — just getting started."],
+      followup: ["Follow up", "Messaged, no reply yet, and due their next message."],
+      sent: ["Sent", "Everyone you've messaged."], replied: ["Replied", "They wrote back."] },
+    statHot: "hot leads", statDue: "follow-ups due", statReplied: "replied",
+    biz: (n) => n === 1 ? "business" : "businesses", where: "Where your leads are",
+    allTrades: "All trades", allStates: "All states", trade: "Trade", state: "State",
+    loading: "Loading…", showMore: (n) => `Show ${n} more`,
+    emptyFilt: ["Nothing here with these filters", "Try all trades or all states."],
+    emptyDue: ["You're all caught up", "No follow-ups due right now."],
+    emptyReplied: ["No replies yet", "They'll show up here when someone writes back."],
+    emptyAll: ["No leads here right now", "New ones appear as the hunter finds them."],
+    noLink: "No link in their bio", socialOnly: "Only a social or booking link in their bio", noSite: "No website found",
+    newBiz: "new business", bizAcct: "business account",
+    pillNoSite: "No website", pillReplied: "Replied", pillAll3: "All 3 sent", pillSent: (n) => `Sent ${n} of 3`, pillHot: "Hot",
+    next: "Next", nextDone: "Done — all 3 messages sent", nextMsg: (n) => `Message ${n} of 3`, lastSent: (a) => `last sent ${a}`,
+    followers: "followers", whyLead: "Why they're a lead", lastPost: "Last post", message: "Message", msgNote: "",
+    copyOpen: "Copy & open IG", openIg: "Open Instagram", markSent: "Mark sent",
+    pipe: "Got a reply, or not a fit?", replied: "Replied", skip: "Skip",
+    copied: "Copied — paste it in the DM", copyFail: "Couldn't copy — select the text",
+    toastCopied: (h) => `Message copied · @${h} opened`,
+    marked: { sent: "Marked sent", replied: "Marked replied", skip: "Skipped" }, saved: "Saved",
+    ask: "Did you send it?", askYes: "Yes, mark sent", askNo: "Not yet",
+    keys: "<kbd>J</kbd>/<kbd>K</kbd> move · <kbd>C</kbd> copy &amp; open · <kbd>S</kbd> sent · <kbd>R</kbd> replied · <kbd>X</kbd> skip",
+    ago: { today: "today", yesterday: "yesterday", days: (n) => `${n} days ago`, weeks: (n) => `${n} weeks ago`, months: (n) => `${n} months ago` },
+    sender: "Auto-sender", checking: "Checking…", connect: "Connect Instagram", start: "Start", stop: "Stop",
+    status: {}, macOff: "Your Mac is offline — wake it up to send.", needAcct: "Connect an Instagram account to send DMs automatically.",
+    sending: (a, q) => `Sending from <b style="display:inline">@${a}</b> · ${q} leads in the queue`, lastTo: (h) => ` · last: @${h}`,
+    alertOffline: "Your Mac's LeadFlow helper is offline. Make sure the Mac is on and awake, then try again.",
+    alertPhone: "Connect from Chrome on your Mac — that's where the sender runs.",
+    confirmLimited: (d) => "Instagram limited the account:\n\n" + d + "\n\nResuming too soon can turn a short block into a long one. Resume anyway?",
+    trades: {}, details: [],
+  },
+  es: {
+    signout: "Cerrar sesión", today: (s, c) => `${s} de ${c} mensajes hoy`,
+    tabs: { hot: ["Calientes", "Los mejores: sin sitio web, publican seguido y tienen seguidores reales."],
+      no_site: ["Sin sitio web", "Negocios sin sitio web que publicaron en los últimos 60 días."],
+      new_business: ["Nuevos", "Cuentas nuevas que todavía no tienen sitio web — recién empiezan."],
+      followup: ["Seguimiento", "Ya les escribiste, no han respondido y les toca el siguiente mensaje."],
+      sent: ["Enviados", "Todos a los que ya les escribiste."], replied: ["Respondieron", "Te contestaron."] },
+    statHot: "leads calientes", statDue: "seguimientos", statReplied: "respondieron",
+    biz: (n) => n === 1 ? "negocio" : "negocios", where: "Dónde están tus leads",
+    allTrades: "Todos los oficios", allStates: "Todos los estados", trade: "Oficio", state: "Estado",
+    loading: "Cargando…", showMore: (n) => `Mostrar ${n} más`,
+    emptyFilt: ["No hay nada con estos filtros", "Prueba con todos los oficios o todos los estados."],
+    emptyDue: ["Estás al día", "No hay seguimientos pendientes ahora."],
+    emptyReplied: ["Todavía no hay respuestas", "Aparecerán aquí cuando alguien conteste."],
+    emptyAll: ["No hay leads aquí por ahora", "Los nuevos aparecen cuando el buscador los encuentra."],
+    noLink: "No tiene enlace en su biografía", socialOnly: "Solo tiene un enlace de redes o de reservas en su biografía",
+    noSite: "No encontramos sitio web", newBiz: "negocio nuevo", bizAcct: "cuenta de empresa",
+    pillNoSite: "Sin sitio web", pillReplied: "Respondió", pillAll3: "Los 3 enviados", pillSent: (n) => `Enviado ${n} de 3`, pillHot: "Caliente",
+    next: "Siguiente", nextDone: "Listo — los 3 mensajes enviados", nextMsg: (n) => `Mensaje ${n} de 3`, lastSent: (a) => `último envío ${a}`,
+    followers: "seguidores", whyLead: "Por qué es un lead", lastPost: "Última publicación", message: "Mensaje",
+    msgNote: "El mensaje va en inglés — cópialo y envíalo tal cual.",
+    copyOpen: "Copiar y abrir IG", openIg: "Abrir Instagram", markSent: "Marcar enviado",
+    pipe: "¿Respondió o no es buen cliente?", replied: "Respondió", skip: "Descartar",
+    copied: "Copiado — pégalo en el mensaje directo", copyFail: "No se pudo copiar — selecciona el texto",
+    toastCopied: (h) => `Mensaje copiado · se abrió @${h}`,
+    marked: { sent: "Marcado como enviado", replied: "Marcado como respondido", skip: "Descartado" }, saved: "Guardado",
+    ask: "¿Lo enviaste?", askYes: "Sí, marcar enviado", askNo: "Todavía no",
+    keys: "<kbd>J</kbd>/<kbd>K</kbd> mover · <kbd>C</kbd> copiar y abrir · <kbd>S</kbd> enviado · <kbd>R</kbd> respondió · <kbd>X</kbd> descartar",
+    ago: { today: "hoy", yesterday: "ayer", days: (n) => `hace ${n} días`, weeks: (n) => `hace ${n} semanas`, months: (n) => `hace ${n} meses` },
+    sender: "Envío automático", checking: "Comprobando…", connect: "Conectar Instagram", start: "Iniciar", stop: "Detener",
+    status: { "sending": "enviando", "connected": "conectado", "done for today": "listo por hoy", "waiting": "esperando",
+      "connecting": "conectando", "blocked": "bloqueado", "error": "error", "not connected": "no conectado" },
+    macOff: "La Mac está apagada o dormida — despiértala para enviar.",
+    needAcct: "Conecta una cuenta de Instagram para enviar mensajes automáticamente.",
+    sending: (a, q) => `Enviando desde <b style="display:inline">@${a}</b> · ${q} leads en la cola`, lastTo: (h) => ` · último: @${h}`,
+    alertOffline: "El ayudante de LeadFlow en la Mac está desconectado. Asegúrate de que la Mac esté encendida y despierta, y vuelve a intentarlo.",
+    alertPhone: "Conéctate desde Chrome en la Mac — ahí es donde funciona el envío.",
+    confirmLimited: (d) => "Instagram limitó la cuenta:\n\n" + d + "\n\nReanudar muy pronto puede convertir un bloqueo corto en uno largo. ¿Reanudar de todos modos?",
+    details: [
+      [/^Not logged in to Instagram/, "No hay sesión de Instagram — haz clic en Conectar Instagram."],
+      [/^Log in to Instagram in the Chrome tab/, "Inicia sesión en Instagram en la pestaña de Chrome que se abrió. Se conecta solo cuando entres."],
+      [/^Didn't see an Instagram login/, "No vimos una sesión de Instagram en Chrome en esta Mac. Inicia sesión en instagram.com en Chrome y vuelve a hacer clic en Conectar."],
+      [/^Couldn't read Chrome's Instagram login/, "No se pudo leer la sesión de Instagram de Chrome. Si la Mac mostró un aviso del llavero, haz clic en Permitir siempre y conecta otra vez."],
+      [/^Paused from the dashboard/, "Pausado desde el panel."],
+      [/^Sending — spread across the day/, "Enviando — repartido durante el día."],
+      [/^Logged in as @([\w.]+)/, (m) => `Sesión iniciada como @${m[1]}.`],
+      [/^Sends between (\d+)am and (\d+)pm Eastern/, (m) => `Envía entre las ${m[1]} a. m. y las ${m[2]} p. m. (hora del Este). Empezará solo.`],
+      [/^Retrying after an error at (.+)\.$/, (m) => `Reintentando después de un error a las ${m[1]}.`],
+      [/^Instagram redirected to/, "Instagram cerró la sesión o pidió verificación. Haz clic en Conectar Instagram para entrar otra vez y revisa la cuenta en la app de Instagram."],
+      [/^The sender crashed/, "El envío falló 3 veces seguidas — avisa a Gregg."],
+    ],
+    trades: { "auto detailing": "Detallado de autos", "mobile detailing": "Detallado móvil", "plumbing": "Plomería", "plumber": "Plomería",
+      "electrician": "Electricista", "hvac": "Aire acondicionado y calefacción", "roofing": "Techos", "painting": "Pintura", "painter": "Pintura",
+      "handyman": "Reparaciones generales", "landscaping": "Paisajismo", "lawn care": "Cuidado de césped", "tree service": "Servicio de árboles",
+      "junk removal": "Retiro de basura", "pressure washing": "Lavado a presión", "pool service": "Servicio de piscinas",
+      "window cleaning": "Limpieza de ventanas", "gutter cleaning": "Limpieza de canaletas", "concrete contractor": "Concreto",
+      "fencing": "Cercas", "sealcoating": "Sellado de asfalto", "moving company": "Mudanzas", "epoxy flooring": "Pisos epóxicos",
+      "hair salon": "Salón de belleza", "cleaning": "Limpieza" },
+  },
+};
+let LANG = (() => { try { return localStorage.getItem("lf_lang") === "es" ? "es" : "en"; } catch { return "en"; } })();
+const T = () => STR[LANG];
+/* sender status sentences come from the Mac helper in English; known ones are shown in Spanish, anything else as-is */
+const detailText = (d) => { for (const [re, out] of T().details) { const m = String(d).match(re); if (m) return typeof out === "function" ? out(m) : out; } return d; };
+const TABS = [["hot", "hot"], ["no_site", "no_site"], ["new_business", "new_business"], ["followup", "followup_due"], ["sent", "sent"], ["replied", "replied"]]
+  .map(([k, stat]) => [k, () => T().tabs[k][0], stat, () => T().tabs[k][1]]);
+const TRADE_LABEL = (n) => n ? (T().trades[n.toLowerCase()] || n.replace(/\b\w/g, (c) => c.toUpperCase())) : "";
+function applyLang() {
+  document.documentElement.lang = LANG;
+  $("#lang-en").classList.toggle("on", LANG === "en"); $("#lang-es").classList.toggle("on", LANG === "es");
+  $("#signout").textContent = T().signout; $("#keys").innerHTML = T().keys;
+  $("#dm-title").textContent = T().sender; $("#dm-connect").textContent = T().connect;
+  $("#dm-start").textContent = T().start; $("#dm-stop").textContent = T().stop;
+  $("#nicheSel").setAttribute("aria-label", T().trade); $("#stateSel").setAttribute("aria-label", T().state);
+}
+window.setLang = (l) => { LANG = l; try { localStorage.setItem("lf_lang", l); } catch {} applyLang(); render(); window.__dmRefresh?.(); };
 let pageLeads = [], active = "no_site", stateFilter = "all", nicheFilter = "all";
 let stats = {}, facets = { regionCounts: {}, nicheCounts: {} };
 let total = 0, offset = 0, loading = false;
@@ -172,7 +285,7 @@ const api = async (url, opts) => {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num = (n) => (+n || 0).toLocaleString();
 const daysSince = (d) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
-const ago = (d) => d == null ? "" : d <= 0 ? "today" : d === 1 ? "yesterday" : d < 14 ? `${d} days ago` : d < 60 ? `${Math.round(d / 7)} weeks ago` : `${Math.round(d / 30)} months ago`;
+const ago = (d) => { const a = T().ago; return d == null ? "" : d <= 0 ? a.today : d === 1 ? a.yesterday : d < 14 ? a.days(d) : d < 60 ? a.weeks(Math.round(d / 7)) : a.months(Math.round(d / 30)); };
 const IG_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r=".6" fill="currentColor"/></svg>`;
 
 
@@ -186,34 +299,34 @@ function renderChrome() {
   $("#tabs").innerHTML = TABS.map(([k, label, stat]) => {
     const n = stats[stat];
     const count = k === "followup" ? (n ? ` <span class="due">${num(n)}</span>` : "") : (n != null ? ` <span class="n">${num(n)}</span>` : "");
-    return `<button class="${k === active ? "on" : ""}" onclick="setTab('${k}')">${label}${count}</button>`;
+    return `<button class="${k === active ? "on" : ""}" onclick="setTab('${k}')">${label()}${count}</button>`;
   }).join("");
 
   $("#stats").innerHTML = [
-    [stats.hot, "hot leads", "hot"], [stats.followup_due, "follow-ups due", "followup"], [stats.replied, "replied", "replied"],
+    [stats.hot, T().statHot, "hot"], [stats.followup_due, T().statDue, "followup"], [stats.replied, T().statReplied, "replied"],
   ].map(([n, l, k]) => `<button class="stat" onclick="setTab('${k}')"><div class="n">${n == null ? "–" : num(n)}</div><div class="l">${l}</div></button>`).join("");
 
   const tab = TABS.find((t) => t[0] === active);
-  $("#sub").textContent = loading ? " " : `${num(total)} ${total === 1 ? "business" : "businesses"} · ${tab[3]}`;
+  $("#sub").textContent = loading ? " " : `${num(total)} ${T().biz(total)} · ${tab[3]()}`;
 
   const sent = stats.sent_today ?? 0, cap = window.__cap || 60;
-  $("#today").textContent = `${sent} of ${cap} DMs today`;
+  $("#today").textContent = T().today(sent, cap);
 
   const nc = facets.nicheCounts || {}, rc = facets.regionCounts || {};
   const niches = Object.keys(nc).sort((a, b) => nc[b] - nc[a]);
   // "Where your leads are" — the trades in this list, as the leads page shows where leads come from
   const top = niches.slice(0, 5), max = Math.max(1, ...top.map((n) => nc[n]));
   $("#where").hidden = !top.length;
-  $("#where").innerHTML = `<h2>Where your leads are<small>${esc(tab[1].toLowerCase())}</small></h2><div class="bars">` +
+  $("#where").innerHTML = `<h2>${T().where}<small>${esc(tab[1]().toLowerCase())}</small></h2><div class="bars">` +
     top.map((n) => `<button class="bar ${n === nicheFilter ? "on" : nicheFilter !== "all" ? "dim" : ""}" onclick="setNiche(nicheFilter === '${esc(n)}' ? 'all' : '${esc(n)}')"><span>${esc(TRADE_LABEL(n))}</span><span>${num(nc[n])}</span>
       <span class="track"><span class="fill" style="width:${(nc[n] / max * 100).toFixed(1)}%;display:block"></span></span></button>`).join("") + `</div>`;
 
   if (nicheFilter !== "all" && !nc[nicheFilter]) niches.unshift(nicheFilter);
-  $("#nicheSel").innerHTML = `<option value="all">All trades</option>` +
+  $("#nicheSel").innerHTML = `<option value="all">${T().allTrades}</option>` +
     niches.map((n) => `<option value="${esc(n)}" ${n === nicheFilter ? "selected" : ""}>${esc(TRADE_LABEL(n))} (${num(nc[n])})</option>`).join("");
   const states = Object.keys(rc).sort();
   if (stateFilter !== "all" && !rc[stateFilter]) states.unshift(stateFilter);
-  $("#stateSel").innerHTML = `<option value="all">All states</option>` +
+  $("#stateSel").innerHTML = `<option value="all">${T().allStates}</option>` +
     states.map((x) => `<option value="${esc(x)}" ${x === stateFilter ? "selected" : ""}>${esc(x)} (${num(rc[x])})</option>`).join("");
 }
 
@@ -221,23 +334,21 @@ function render() {
   renderChrome();
   if (!pageLeads.length) {
     $("#list").innerHTML = loading
-      ? `<div class="empty">Loading…</div>`
+      ? `<div class="empty">${T().loading}</div>`
       : emptyState();
     return;
   }
   let html = pageLeads.map(card).join("");
   if (pageLeads.length < total)
-    html += `<button class="soft more" onclick="showMore()">${loading ? "Loading…" : `Show ${num(Math.min(PAGE, total - pageLeads.length))} more`}</button>`;
+    html += `<button class="soft more" onclick="showMore()">${loading ? T().loading : T().showMore(num(Math.min(PAGE, total - pageLeads.length)))}</button>`;
   $("#list").innerHTML = html;
   document.querySelectorAll("#list textarea").forEach(grow);
 }
 
 function emptyState() {
   const filtered = nicheFilter !== "all" || stateFilter !== "all";
-  if (filtered) return `<div class="empty"><b>Nothing here with these filters</b>Try all trades or all states.</div>`;
-  if (active === "followup") return `<div class="empty"><b>You're all caught up</b>No follow-ups due right now.</div>`;
-  if (active === "replied") return `<div class="empty"><b>No replies yet</b>They'll show up here when someone writes back.</div>`;
-  return `<div class="empty"><b>No leads here right now</b>New ones appear as the hunter finds them.</div>`;
+  const [b, s] = filtered ? T().emptyFilt : active === "followup" ? T().emptyDue : active === "replied" ? T().emptyReplied : T().emptyAll;
+  return `<div class="empty"><b>${b}</b>${s}</div>`;
 }
 
 /* ---------- a lead ---------- */
@@ -245,11 +356,11 @@ function emptyState() {
    Turn it into one plain sentence of why they're a lead. */
 function whyLine(l) {
   const why = String(l.hot_why || "").split("|")[0].toLowerCase(), out = [];
-  if (/no link in bio/.test(why)) out.push("No link in their bio");
-  else if (/booking\/social page only|social page only|linktree|link page/.test(why)) out.push("Only a social or booking link in their bio");
-  else out.push("No website found");
-  if (/new business/.test(why)) out.push("new business");
-  if (/business acct/.test(why)) out.push("business account");
+  if (/no link in bio/.test(why)) out.push(T().noLink);
+  else if (/booking\/social page only|social page only|linktree|link page/.test(why)) out.push(T().socialOnly);
+  else out.push(T().noSite);
+  if (/new business/.test(why)) out.push(T().newBiz);
+  if (/business acct/.test(why)) out.push(T().bizAcct);
   return out.join(" · ");
 }
 
@@ -257,33 +368,34 @@ function card(l) {
   const d = daysSince(l.last_active);
   const place = [TRADE_LABEL(l.niche), l.area].filter(Boolean).map(esc).join(" · ");
   const handle = esc(l.ig_handle);
-  let pill = `<span class="st ok">No website</span>`;
-  if (l.status === "replied") pill = `<span class="st brand">Replied</span>`;
-  else if (l.status === "sent") pill = `<span class="st muted">${l.touches >= 3 ? "All 3 sent" : `Sent ${l.touches || 1} of 3`}</span>`;
-  else if ((l.hot_score ?? 0) >= 60) pill = `<span class="st ok">Hot · ${l.hot_score}</span>`;
+  const t = T();
+  let pill = `<span class="st ok">${t.pillNoSite}</span>`;
+  if (l.status === "replied") pill = `<span class="st brand">${t.pillReplied}</span>`;
+  else if (l.status === "sent") pill = `<span class="st muted">${l.touches >= 3 ? t.pillAll3 : t.pillSent(l.touches || 1)}</span>`;
+  else if ((l.hot_score ?? 0) >= 60) pill = `<span class="st ok">${t.pillHot} · ${l.hot_score}</span>`;
   const ls = daysSince(l.last_touch_at);
   const sentLine = l.status === "sent" && l.touches
-    ? `<dt>Next</dt><dd>${l.touches >= 3 ? "Done — all 3 messages sent" : `Message ${l.touches + 1} of 3`}${ls != null ? ` <span style="color:var(--muted)">· last sent ${ago(ls)}</span>` : ""}</dd>` : "";
+    ? `<dt>${t.next}</dt><dd>${l.touches >= 3 ? t.nextDone : t.nextMsg(l.touches + 1)}${ls != null ? ` <span style="color:var(--muted)">· ${t.lastSent(ago(ls))}</span>` : ""}</dd>` : "";
   return `<article class="card" id="lead-${l.id}" data-id="${l.id}">
     <div class="lead-top">
       <div><div class="t">${esc(l.name)}</div>
-        <div class="when"><a href="https://www.instagram.com/${handle}/" target="_blank" rel="noopener">@${handle}</a>${l.ig_followers ? ` · ${num(l.ig_followers)} followers` : ""}</div></div>
+        <div class="when"><a href="https://www.instagram.com/${handle}/" target="_blank" rel="noopener">@${handle}</a>${l.ig_followers ? ` · ${num(l.ig_followers)} ${t.followers}` : ""}</div></div>
       ${pill}
     </div>
     <div class="came">📍 ${place}</div>
     <dl>
-      <dt>Why they're a lead</dt><dd>${esc(whyLine(l))}</dd>
-      ${d != null ? `<dt>Last post</dt><dd>${esc(ago(d).replace(/^./, (c) => c.toUpperCase()))}</dd>` : ""}
+      <dt>${t.whyLead}</dt><dd>${esc(whyLine(l))}</dd>
+      ${d != null ? `<dt>${t.lastPost}</dt><dd>${esc(ago(d).replace(/^./, (c) => c.toUpperCase()))}</dd>` : ""}
       ${sentLine}
-      ${l.status === "replied" ? "" : `<dt>Message</dt><dd><textarea rows="1" aria-label="Message" oninput="grow(this)" onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea></dd>`}
+      ${l.status === "replied" ? "" : `<dt>${t.message}</dt><dd><textarea rows="1" lang="en" aria-label="${t.message}" oninput="grow(this)" onchange="saveMsg(${l.id}, this.value)">${esc(msgFor(l))}</textarea>${t.msgNote ? `<span class="msgnote">${t.msgNote}</span>` : ""}</dd>`}
     </dl>
     <div class="actions">
-      <button class="main" onclick="copyOpen(${l.id}, this)"><span>${l.status === "replied" ? "Open Instagram" : "Copy & open IG"}</span></button>
-      ${l.status === "replied" ? "" : `<button class="soft" onclick="setStatus(${l.id}, 'sent')">Mark sent</button>`}
+      <button class="main" onclick="copyOpen(${l.id}, this)"><span>${l.status === "replied" ? t.openIg : t.copyOpen}</span></button>
+      ${l.status === "replied" ? "" : `<button class="soft" onclick="setStatus(${l.id}, 'sent')">${t.markSent}</button>`}
     </div>
-    ${l.status === "replied" ? "" : `<div class="pipe"><span class="lbl">Got a reply, or not a fit?</span><span class="right">
-      <button onclick="setStatus(${l.id}, 'replied')">Replied</button>
-      ${l.status === "sent" ? "" : `<button class="skip" onclick="setStatus(${l.id}, 'skip')">Skip</button>`}</span></div>`}
+    ${l.status === "replied" ? "" : `<div class="pipe"><span class="lbl">${t.pipe}</span><span class="right">
+      <button onclick="setStatus(${l.id}, 'replied')">${t.replied}</button>
+      ${l.status === "sent" ? "" : `<button class="skip" onclick="setStatus(${l.id}, 'skip')">${t.skip}</button>`}</span></div>`}
   </article>`;
 }
 
@@ -343,9 +455,9 @@ function askSent() {
   if (!el || el.querySelector(".askbar")) return;
   el.classList.add("ask");
   el.insertAdjacentHTML("beforeend",
-    `<div class="askbar">Did you send it?
-       <button onclick="setStatus(${id}, 'sent')">Yes, mark sent</button>
-       <button class="ghost" onclick="const c=this.closest('.card'); c.classList.remove('ask'); this.parentElement.remove()">Not yet</button></div>`);
+    `<div class="askbar">${T().ask}
+       <button onclick="setStatus(${id}, 'sent')">${T().askYes}</button>
+       <button class="ghost" onclick="const c=this.closest('.card'); c.classList.remove('ask'); this.parentElement.remove()">${T().askNo}</button></div>`);
   el.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 window.addEventListener("focus", () => { if (awaitingSent) setTimeout(askSent, 150); });
@@ -362,8 +474,8 @@ window.copyOpen = async (id, btn) => {
   const ok = await copyText(text);
   const span = btn.querySelector("span"), original = span.textContent;
   btn.classList.add(ok ? "done" : "fail");
-  span.textContent = ok ? "Copied — paste it in the DM" : "Couldn't copy — select the text";
-  if (ok) toast(`Message copied · @${l.ig_handle} opened`);
+  span.textContent = ok ? T().copied : T().copyFail;
+  if (ok) toast(T().toastCopied(l.ig_handle));
   setTimeout(() => { btn.classList.remove("done", "fail"); span.textContent = original; }, 2200);
 };
 
@@ -372,7 +484,7 @@ window.setStatus = async (id, status) => {
   pageLeads = pageLeads.filter((x) => x.id !== id);
   total = Math.max(0, total - 1);
   render();
-  const word = { sent: "Marked sent", replied: "Marked replied", skip: "Skipped" }[status] || "Saved";
+  const word = T().marked[status] || T().saved;
   if (l) toast(`${word} · ${l.name}`);
   await api(`/api/leads/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
   [stats, facets] = await Promise.all([api("/api/stats"), api(`/api/facets?status=${active}`)]);
@@ -412,7 +524,7 @@ document.addEventListener("keydown", (e) => {
 (async () => {
   const fromHash = location.hash.slice(1);
   if (TABS.some((t) => t[0] === fromHash)) active = fromHash;
-  loading = true; render();
+  applyLang(); loading = true; render();
   stats = await api("/api/stats");
   await loadPage();
 })();
@@ -430,15 +542,15 @@ document.addEventListener("keydown", (e) => {
     let d; try { const r = await fetch("/api/dm", { credentials: "same-origin" }); if (!r.ok) return; d = await r.json(); } catch { return; }
     last = d; window.__cap = d.budget?.cap || 60;
     $id("dm-dot").className = "dot " + (DOT[d.status] || "");
-    $id("dm-status").textContent = d.status ? "· " + d.status : "";
+    $id("dm-status").textContent = d.status ? "· " + (T().status[d.status] || d.status) : "";
     const bad = ["blocked", "error"].includes(d.status) || !d.macOnline;
     $id("dm-bar").className = "alertbar" + (bad ? " bad" : "");
     const last1 = (d.recent || [])[0];
-    $id("dm-sub").innerHTML = !d.macOnline ? "Your Mac is offline — wake it up to send."
-      : d.detail ? esc(d.detail)
-      : !d.account ? "Connect an Instagram account to send DMs automatically."
-      : `Sending from <b style="display:inline">@${esc(String(d.account).replace(/^@/, ""))}</b> · ${num(d.queued)} leads in the queue` +
-        (last1 ? ` · last: @${esc(last1.ig_handle)}` : "");
+    $id("dm-sub").innerHTML = !d.macOnline ? T().macOff
+      : d.detail ? esc(detailText(d.detail))
+      : !d.account ? T().needAcct
+      : T().sending(esc(String(d.account).replace(/^@/, "")), num(d.queued)) +
+        (last1 ? T().lastTo(esc(last1.ig_handle)) : "");
     const running = d.desired === "running";
     $id("dm-start").disabled = !d.account || d.status === "connecting";
     $id("dm-start").hidden = running || !d.account || d.status === "not connected";
@@ -448,8 +560,8 @@ document.addEventListener("keydown", (e) => {
     renderChrome();
   }
   $id("dm-connect").onclick = () => {
-    if (last && !last.macOnline) return alert("Your Mac's LeadFlow helper is offline. Make sure the Mac is on and awake, then try again.");
-    if (/iPhone|iPad|Android/i.test(navigator.userAgent)) return alert("Connect from Chrome on your Mac — that's where the sender runs.");
+    if (last && !last.macOnline) return alert(T().alertOffline);
+    if (/iPhone|iPad|Android/i.test(navigator.userAgent)) return alert(T().alertPhone);
     window.open("https://www.instagram.com/", "_blank");
     post("/api/dm/connect").then(refresh);
   };
@@ -457,12 +569,13 @@ document.addEventListener("keydown", (e) => {
     const r = await post("/api/dm/start");
     if (r.status === 409) {
       const j = await r.json();
-      if (!confirm("Instagram limited the account:\n\n" + (j.detail || "") + "\n\nResuming too soon can turn a short block into a long one. Resume anyway?")) return;
+      if (!confirm(T().confirmLimited(j.detail || ""))) return;
       await post("/api/dm/start", { confirm: true });
     }
     refresh();
   };
   $id("dm-stop").onclick = async () => { await post("/api/dm/stop"); refresh(); };
+  window.__dmRefresh = refresh;
   refresh(); setInterval(refresh, 10000);
 })();
 </script>

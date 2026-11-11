@@ -65,7 +65,7 @@ async function hunt(query: string): Promise<any[] | null> {
   const input = {
     search: query,
     searchType: "user",
-    searchLimit: 20,
+    searchLimit: Number(process.env.HUNT_SEARCH_LIMIT ?? 10), // 20 until 11-10: the tail was big national accounts we reject (39% of one run's spend went to >50k-follower profiles)
     resultsType: "details",
     resultsLimit: 5, // recent posts per profile — this is what carries recency
     addParentData: false,

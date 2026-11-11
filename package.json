@@ -23,7 +23,8 @@
     "maps": "tsx src/mapshunt.ts",
     "dmbot": "tsx src/dmbot.ts",
     "linkpage": "tsx src/linkpage.ts",
-    "sweep": "tsx src/sweep.ts"
+    "sweep": "tsx src/sweep.ts",
+    "taghunt": "tsx src/taghunt.ts"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

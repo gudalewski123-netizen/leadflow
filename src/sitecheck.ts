@@ -35,7 +35,9 @@ export const LINKPAGE_UNCHECKED_SQL =
 
 /* Trades Gregg doesn't sell to (2026-10-18: "I don't care about hair salons"). Kept in the database,
    left out of every outreach queue. */
-export const NOT_EXCLUDED_NICHE_SQL = `COALESCE(niche, '') NOT IN ('hair salon')`;
+/* 2026-11-10 Gregg: "hot garbage… it's all the same people… we need trades people, that is crucial" — 332 of 505
+   sendable leads were car detailers. Detailers stay in the table but leave every list and the DM bot. */
+export const NOT_EXCLUDED_NICHE_SQL = `(COALESCE(niche, '') NOT IN ('hair salon') AND COALESCE(niche, '') NOT ILIKE '%detailing%')`;
 
 /* The "No site" Instagram queue (2026-10-18, Gregg: "these leads are hot garbage" — the tab was 5,929
    June Google-Maps rows, only 7 with a handle and none ever opened). A lead qualifies only when we

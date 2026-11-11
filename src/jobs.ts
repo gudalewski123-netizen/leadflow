@@ -11,7 +11,9 @@ import { pool } from "./db.js";
 import { STATE_CITIES } from "./cities.js";
 import { MORE_CITIES } from "./morecities.js";
 
-const niches = (process.argv[2] ?? "auto detailing").split(",").map((s) => s.trim()).filter(Boolean);
+/* 2026-11-10 Gregg: "I don't want car detailers… I want real leads, trades people… new accounts". Default = trades only. */
+export const TRADES = "plumbing,electrician,hvac,roofing,handyman,painting,landscaping,lawn care,tree service,fencing,concrete contractor,hardscaping,masonry,pressure washing,window cleaning,gutter cleaning,junk removal,sealcoating,epoxy flooring,pool service,moving company,christmas light installation";
+const niches = (process.argv[2] ?? TRADES).split(",").map((s) => s.trim()).filter(Boolean);
 const done = new Set((await pool.query(`SELECT query FROM hunt_queries`)).rows.map((r) => String(r.query).toLowerCase()));
 const perTrade: { niche: string; city: string; state: string }[][] = [];
 for (const niche of niches) {

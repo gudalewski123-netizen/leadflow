@@ -55,9 +55,15 @@ const TAG_WORDS: Record<string, string[]> = {
   "hardscaping": ["pavers", "hardscape"],
   "christmas light installation": ["christmaslights"],
 };
-const SKIP = /\b(depot|lowe'?s|home\s?advisor|angi|thumbtack|yelp|nextdoor|realty|realtor|magazine|news|seo|marketing|agency|leads|hardware)\b|clientflow|leadgen/i;   // 11-10: 'Concrete Leads' marketer, a hardware store
+const SKIP = /\b(depot|lowe'?s|home\s?advisor|angi|thumbtack|yelp|nextdoor|realty|realtor|magazine|news|seo|marketing|agency|leads|hardware|supply|winsupply|alliance|foundation|nonprofit)\b|clientflow|leadgen/i;   // 11-10: 'Concrete Leads' marketer, a hardware store
 
-const api = (p: string, o: any = {}) => fetch(`https://api.apify.com/v2/${p}${p.includes("?") ? "&" : "?"}token=${TOKEN}`, o).then((r) => r.json() as any);
+/* retries: a network blip while polling killed the first $5 run after 4 batches (11-10) */
+async function api(p: string, o: any = {}): Promise<any> {
+  for (let i = 0; ; i++) {
+    try { return await fetch(`https://api.apify.com/v2/${p}${p.includes("?") ? "&" : "?"}token=${TOKEN}`, o).then((r) => r.json()); }
+    catch (e) { if (i >= 6 || o.method === "POST") throw e; await new Promise((z) => setTimeout(z, 5000 * (i + 1))); }
+  }
+}
 const usage = async () => (await api("users/me/limits")).data.current.monthlyUsageUsd as number;
 async function run(actor: string, input: any): Promise<any[] | null> {
   const r = await api(`acts/${actor}/runs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });

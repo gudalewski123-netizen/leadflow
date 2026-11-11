@@ -25,9 +25,10 @@ import { syncWebsitesFromBio } from "./sitecheck.js";
 
 const TOKEN = fs.readFileSync(`${process.env.HOME}/.tier1-config/.env`, "utf8").match(/^APIFY_TOKEN=["']?([^"'\n]+)/m)![1];
 const TAG_ACTOR = "scrapesmith~instagram-hashtag-scraper";
-const PROFILE_ACTOR = "coderx~instagram-profile-scraper-bio-posts";
+/* dami_studio: $0.00069/profile (11-11) vs coderx $0.0015 — same fields we need: externalUrl(s), followers, engagement.daysSinceLastPost, joinedRecently */
+const PROFILE_ACTOR = "dami_studio~instagram-profile-scraper";
 const MAX_TAGS = Number(process.argv[2] ?? 200);
-const PER_TAG = Number(process.argv[3] ?? 30);
+const PER_TAG = Number(process.argv[3] ?? 15);   // 30 until 11-11: busy accounts repeat under one tag (4.6 posts per new poster)
 const MAX_SPEND = Number(process.env.HUNT_MAX_SPEND ?? 0);
 if (!MAX_SPEND) { console.error("Set HUNT_MAX_SPEND (the Apify monthly total to stop at)."); process.exit(1); }
 
@@ -96,12 +97,29 @@ let spent0 = await usage();
 console.log(`Apify now $${spent0.toFixed(2)}; ceiling $${MAX_SPEND}. ${tags.length} hashtags queued.`);
 let added = 0, keepers = 0, checked = 0, postsSeen = 0;
 
-for (let b = 0; b < tags.length; b += 40) {
-  const batch = tags.slice(b, b + 40);
+/* TAG_SOURCE=apidojo (11-11): scrapesmith returned 0 posts for every tag ("Request failed") — apidojo charges
+   $0.01584 per hashtag link + $0.000396 per post, so it runs one link per run (maxItems is per run, not per tag)
+   with ~40 posts each to spread the fee. Its posts are normalised to the scrapesmith shape used below. */
+const SOURCE = (process.env.TAG_SOURCE ?? "scrapesmith").toLowerCase();
+const BATCH = SOURCE === "apidojo" ? 10 : 40;
+async function fetchPosts(batch: Tag[]): Promise<any[] | null> {
+  if (SOURCE !== "apidojo") return run(TAG_ACTOR, { hashtags: batch.map((t) => t.tag), maxResultsPerHashtag: PER_TAG });
+  const out = await Promise.all(batch.map(async (t) => {
+    const items = await run("apidojo~instagram-hashtag-scraper", { startUrls: [`https://www.instagram.com/explore/tags/${t.tag}/`], maxItems: PER_TAG, getPosts: true, getReels: true });
+    return (items ?? []).map((p: any) => ({ inputUrl: `https://www.instagram.com/explore/tags/${t.tag}/`, ownerUsername: p.owner?.username, ownerFullName: p.owner?.fullName ?? p.owner?.full_name, caption: p.caption, timestamp: p.createdAt }));
+  }));
+  return out.flat();
+}
+const perTagCost = SOURCE === "apidojo" ? 0.01584 + PER_TAG * 0.000396 : PER_TAG * 0.00035;
+
+for (let b = 0; b < tags.length; b += BATCH) {
+  const batch = tags.slice(b, b + BATCH);
   const now = await usage();
-  if (now + batch.length * PER_TAG * 0.00035 + 60 * 0.0016 > MAX_SPEND) { console.log(`Stopping: next batch could pass $${MAX_SPEND} (now $${now.toFixed(2)}).`); break; }
-  const posts = await run(TAG_ACTOR, { hashtags: batch.map((t) => t.tag), maxResultsPerHashtag: PER_TAG });
+  if (now + batch.length * perTagCost + 150 * 0.0008 > MAX_SPEND) { console.log(`Stopping: next batch could pass $${MAX_SPEND} (now $${now.toFixed(2)}).`); break; }
+  const posts = await fetchPosts(batch);
   if (posts === null) continue;
+  // 0 posts for a whole batch = the scraper is blocked (11-11: every tag 'Request failed'), not 40 empty tags — stop, record nothing
+  if (!posts.length) { console.log(`  batch ${b / BATCH + 1}: 0 posts — hashtag scraper returned nothing (blocked?). Stopping without marking these tags done.`); break; }
   postsSeen += posts.length;
 
   // one candidate per new poster, attributed to the first tag we saw them under
@@ -118,7 +136,7 @@ for (let b = 0; b < tags.length; b += 40) {
     cand.set(h, { t, name, caption: String(p.caption ?? "") });
   }
   for (const t of batch) await pool.query(`INSERT INTO hunt_queries (query, new_leads) VALUES ($1, 0) ON CONFLICT (query) DO UPDATE SET ran_at = now()`, [`tag:${t.tag}`]);
-  if (!cand.size) { console.log(`  batch ${b / 40 + 1}: ${posts.length} posts, no new posters`); continue; }
+  if (!cand.size) { console.log(`  batch ${b / BATCH + 1}: ${posts.length} posts, no new posters`); continue; }
 
   const profiles = await run(PROFILE_ACTOR, { usernames: [...cand.keys()] });
   if (profiles === null) continue;
@@ -128,15 +146,17 @@ for (let b = 0; b < tags.length; b += 40) {
     const c = cand.get(h);
     if (!c) continue;
     known.add(h); checked++;
-    const link = x.external_url || (Array.isArray(x.externalUrls) && x.externalUrls[0]?.url) || null;
+    const link = x.externalUrl || x.external_url || (Array.isArray(x.externalUrls) && x.externalUrls[0]?.url) || null;
     const bio = String(x.biography ?? "");
     const name = String(x.fullName || c.name || h);
     if ((x.followersCount ?? 0) > MAX_FOLLOWERS) continue;
     if (junkReason({ name, ig_handle: h, niche: c.t.niche, ig_followers: x.followersCount, ig_link: link, bio, verified: Boolean(x.verified) }, true)) continue;
     const ts = ((x.latestPosts ?? []) as any[]).map((p) => Math.floor((Date.parse(p.timestamp ?? "") || 0) / 1000)).filter(Boolean);
-    const prof: Profile = { lastPost: ts.length ? Math.max(...ts) : null, followers: x.followersCount ?? null, posts: x.postsCount ?? null, externalUrl: link, email: null, phone: null, isBusiness: Boolean(x.isBusinessAccount) };
+    const dsl = x.engagement?.daysSinceLastPost;
+    if (!ts.length && typeof dsl === "number") ts.push(Math.floor(Date.now() / 1000 - dsl * 86400));
+    const prof: Profile = { lastPost: ts.length ? Math.max(...ts) : null, followers: x.followersCount ?? null, posts: x.postsCount ?? null, externalUrl: link, email: x.businessEmail ?? null, phone: x.businessPhoneNumber ?? null, isBusiness: Boolean(x.isBusinessAccount) };
     const { score, why } = scoreOf(prof);
-    if (x.is_joined_recently) why.push("NEW ACCOUNT (Instagram: joined recently)");
+    if (x.joinedRecently || x.is_joined_recently) why.push("NEW ACCOUNT (Instagram: joined recently)");
     why.push(`found via #${c.t.tag}`);
     const r = await pool.query(
       `INSERT INTO leads (name, niche, area, state, ig_handle, status, source, last_active, ig_followers, ig_posts, ig_link, ig_business, hot_score, hot_why, ig_checked_at)
@@ -148,11 +168,11 @@ for (let b = 0; b < tags.length; b += 40) {
     const fresh = prof.lastPost && Date.now() / 1000 - prof.lastPost < 60 * 86400;
     if (!link && fresh && (prof.followers ?? 0) >= 30 && (prof.followers ?? 0) <= 15000) {
       keepers++; batchKeep++;
-      console.log(`  ✅ @${h} ${prof.followers}f · ${c.t.niche} · ${c.t.city} ${c.t.state}${x.is_joined_recently ? " · NEW" : ""}`);
+      console.log(`  ✅ @${h} ${prof.followers}f · ${c.t.niche} · ${c.t.city} ${c.t.state}${x.joinedRecently || x.is_joined_recently ? " · NEW" : ""}`);
     }
   }
   const s = await usage();
-  console.log(`  batch ${b / 40 + 1}: ${posts.length} posts → ${cand.size} new posters → ${batchKeep} no-website & active | Apify $${s.toFixed(2)}`);
+  console.log(`  batch ${b / BATCH + 1}: ${posts.length} posts → ${cand.size} new posters → ${batchKeep} no-website & active | Apify $${s.toFixed(2)}`);
 }
 
 await syncWebsitesFromBio(pool).catch(() => 0);

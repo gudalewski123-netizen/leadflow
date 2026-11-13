@@ -9,3 +9,6 @@ check.mjs
 .ig-profile/
 STOP-DMBOT
 logs/dmbot.lock
+jobs-*.json
+.scout-profile/
+STOP-SCOUT

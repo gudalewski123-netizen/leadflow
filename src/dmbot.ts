@@ -122,7 +122,8 @@ async function queue(limit: number): Promise<Lead[]> {
          -- ~175 leads = one day at 150/day, and it didn't check recent posting). Hottest first.
          OR ${SENDABLE_SQL}
       )
-      ORDER BY (status='sent') DESC, hot_score DESC NULLS LAST, id
+      -- 2026-11-21 cheat code: brand-new businesses first (2.9% reply vs 0.16% for everyone else, 103 vs 1,870 sent)
+      ORDER BY (status='sent') DESC, (COALESCE(hot_why, '') LIKE '%NEW BUSINESS%') DESC, hot_score DESC NULLS LAST, id
       LIMIT $1`,
     [limit]
   );

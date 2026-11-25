@@ -131,6 +131,9 @@ function tabConds(status: string): string[] {
   // score.ts. Tagged into hot_why at scoring time.
   // verified no website + active (no follower floor — a brand-new account is the point); 10-18: the old rule
   // also listed new businesses that HAVE a website (Right Way Epoxy, Clean Homes WY)
+  /* Just pulled (Gregg 2026-11-24: "where are the leads we recently pulled"): every lead the Apify hunt or the
+     in-tab scout added in the last 14 days, best first, so a fresh pull is easy to find and work. */
+  else if (status === "recent") c.push("source IN ('apify_hunt','ig_scout') AND created_at > now() - interval '14 days' AND status NOT IN ('dead','skip','archived')");
   else if (status === "new_business") c.push(igNoSiteSql(0), "hot_why LIKE '%NEW BUSINESS%'");
   // Follow-up due: messaged, never replied, and enough time has passed for
   // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
@@ -185,8 +188,8 @@ app.get("/api/leads", async (req, res) => {
       // 2026-11-09 (Gregg: "I want all types of leads"): trades take turns down the list — each trade's best,
       // then each trade's second best… — so one cheap-to-find trade (detailing) can't fill the top of the page.
       // With a trade filter on, the partition is that one trade and the order is plain best-first.
-      ? `SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY COALESCE(niche, '') ORDER BY (ig_checked_at IS NOT NULL) DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC) AS turn
-           FROM leads ${where}) t ORDER BY turn, (ig_checked_at IS NOT NULL) DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`
+      ? `SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY COALESCE(niche, '') ORDER BY (ig_checked_at IS NOT NULL) DESC, (COALESCE(hot_why, '') LIKE '%NEW BUSINESS%') DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC) AS turn
+           FROM leads ${where}) t ORDER BY turn, (ig_checked_at IS NOT NULL) DESC, (COALESCE(hot_why, '') LIKE '%NEW BUSINESS%') DESC, hot_score DESC NULLS LAST, last_active DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`
       : `SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY COALESCE(niche, '') ORDER BY hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC) AS turn
            FROM leads ${where}) t ORDER BY turn, hot_score DESC NULLS LAST, reviews DESC NULLS LAST, id DESC LIMIT ${limit} OFFSET ${offset}`,
     params
@@ -222,6 +225,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))::int AS no_site,
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} AND hot_score >= 60)::int AS hot,
       COUNT(*) FILTER (WHERE ${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
+      COUNT(*) FILTER (WHERE source IN ('apify_hunt','ig_scout') AND created_at > now() - interval '14 days' AND status NOT IN ('dead','skip','archived'))::int AS recent,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE status = 'sent' AND touches < 3
         AND last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)

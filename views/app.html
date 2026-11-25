@@ -161,7 +161,8 @@
 const STR = {
   en: {
     signout: "Sign out", today: (s, c) => `${s} of ${c} DMs today`,
-    tabs: { hot: ["Hot", "The best of them: no website, posting lately, a real following."],
+    tabs: { recent: ["Just pulled", "Everything the last lead pulls added (past 14 days), best first."],
+      hot: ["Hot", "The best of them: no website, posting lately, a real following."],
       no_site: ["No website", "Businesses with no website, posting in the last 60 days."],
       new_business: ["New", "Young accounts with no website yet — just getting started."],
       followup: ["Follow up", "Messaged, no reply yet, and due their next message."],
@@ -197,7 +198,8 @@ const STR = {
   },
   es: {
     signout: "Cerrar sesión", today: (s, c) => `${s} de ${c} mensajes hoy`,
-    tabs: { hot: ["Calientes", "Los mejores: sin sitio web, publican seguido y tienen seguidores reales."],
+    tabs: { recent: ["Recién traídos", "Todo lo que agregaron las últimas búsquedas (últimos 14 días), los mejores primero."],
+      hot: ["Calientes", "Los mejores: sin sitio web, publican seguido y tienen seguidores reales."],
       no_site: ["Sin sitio web", "Negocios sin sitio web que publicaron en los últimos 60 días."],
       new_business: ["Nuevos", "Cuentas nuevas que todavía no tienen sitio web — recién empiezan."],
       followup: ["Seguimiento", "Ya les escribiste, no han respondido y les toca el siguiente mensaje."],
@@ -259,7 +261,7 @@ let LANG = (() => { try { return localStorage.getItem("lf_lang") === "es" ? "es"
 const T = () => STR[LANG];
 /* sender status sentences come from the Mac helper in English; known ones are shown in Spanish, anything else as-is */
 const detailText = (d) => { for (const [re, out] of T().details) { const m = String(d).match(re); if (m) return typeof out === "function" ? out(m) : out; } return d; };
-const TABS = [["hot", "hot"], ["no_site", "no_site"], ["new_business", "new_business"], ["followup", "followup_due"], ["sent", "sent"], ["replied", "replied"]]
+const TABS = [["recent", "recent"], ["hot", "hot"], ["no_site", "no_site"], ["new_business", "new_business"], ["followup", "followup_due"], ["sent", "sent"], ["replied", "replied"]]
   .map(([k, stat]) => [k, () => T().tabs[k][0], stat, () => T().tabs[k][1]]);
 const TRADE_LABEL = (n) => n ? (T().trades[n.toLowerCase()] || n.replace(/\b\w/g, (c) => c.toUpperCase())) : "";
 function applyLang() {

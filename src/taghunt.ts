@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import { pool, init } from "./db.js";
 import { MONEY_PLACES } from "./metros.js";
-import { scoreOf, isFranchise, type Profile } from "./score.js";
+import { scoreOf, isFranchise, isLikelyNewBusiness, type Profile } from "./score.js";
 import { isRelevant, MAX_FOLLOWERS } from "./relevance.js";
 import { junkReason } from "./quality.js";
 import { findChains, brandKey } from "./chains.js";
@@ -155,8 +155,13 @@ for (let b = 0; b < tags.length; b += BATCH) {
     const dsl = x.engagement?.daysSinceLastPost;
     if (!ts.length && typeof dsl === "number") ts.push(Math.floor(Date.now() / 1000 - dsl * 86400));
     const prof: Profile = { lastPost: ts.length ? Math.max(...ts) : null, followers: x.followersCount ?? null, posts: x.postsCount ?? null, externalUrl: link, email: x.businessEmail ?? null, phone: x.businessPhoneNumber ?? null, isBusiness: Boolean(x.isBusinessAccount) };
-    const { score, why } = scoreOf(prof);
-    if (x.joinedRecently || x.is_joined_recently) why.push("NEW ACCOUNT (Instagram: joined recently)");
+    const scored = scoreOf(prof);
+    let score = scored.score; const why = scored.why;
+    /* 2026-11-21 CHEAT CODE (Gregg): brand-new business accounts are the ones shopping for a website.
+       Instagram's own "joined recently" flag is the strongest new-account signal there is, so it scores
+       like one (+25) and carries the NEW BUSINESS tag the dashboard filter and the DM queue look for. */
+    const joinedNew = Boolean(x.joinedRecently || x.is_joined_recently);
+    if (joinedNew) { score = Math.min(100, score + 25); if (!why.some((w) => w.includes("NEW BUSINESS"))) why.push("NEW BUSINESS (Instagram: joined recently)"); }
     why.push(`found via #${c.t.tag}`);
     const r = await pool.query(
       `INSERT INTO leads (name, niche, area, state, ig_handle, status, source, last_active, ig_followers, ig_posts, ig_link, ig_business, hot_score, hot_why, ig_checked_at)
@@ -166,9 +171,10 @@ for (let b = 0; b < tags.length; b += BATCH) {
     if (!r.rowCount) continue;
     added++;
     const fresh = prof.lastPost && Date.now() / 1000 - prof.lastPost < 60 * 86400;
-    if (!link && fresh && (prof.followers ?? 0) >= 30 && (prof.followers ?? 0) <= 15000) {
+    /* a brand-new account has no followers yet; that is the point, so no follower floor for it */
+    if (!link && fresh && ((prof.followers ?? 0) >= 30 || joinedNew || isLikelyNewBusiness(prof)) && (prof.followers ?? 0) <= 15000) {
       keepers++; batchKeep++;
-      console.log(`  ✅ @${h} ${prof.followers}f · ${c.t.niche} · ${c.t.city} ${c.t.state}${x.joinedRecently || x.is_joined_recently ? " · NEW" : ""}`);
+      console.log(`  ${joinedNew ? "🆕" : "✅"} @${h} ${prof.followers}f · ${c.t.niche} · ${c.t.city} ${c.t.state}${joinedNew ? " · NEW ACCOUNT" : ""}`);
     }
   }
   const s = await usage();

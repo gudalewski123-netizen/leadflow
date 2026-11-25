@@ -131,10 +131,10 @@ function tabConds(status: string): string[] {
   // score.ts. Tagged into hot_why at scoring time.
   // verified no website + active (no follower floor — a brand-new account is the point); 10-18: the old rule
   // also listed new businesses that HAVE a website (Right Way Epoxy, Clean Homes WY)
-  /* Just pulled (Gregg 2026-11-24: "where are the leads we recently pulled"): leads the Apify hunt or the in-tab
-     scout added in the last 14 days that have NOT been messaged yet (status 'new'), best first. Messaged ones live
+  /* Just pulled (Gregg 2026-11-24: "where are the leads we recently pulled"): leads the Apify hunt added (the free in-tab scout's
+     older names are left out, Gregg: "the 1300 we just pulled from Apify") in the last 14 days that have NOT been messaged yet (status 'new'), best first. Messaged ones live
      in Sent / Follow up only — showing them here read as "you re-added people we already DM'd" (Gregg, same day). */
-  else if (status === "recent") c.push("source IN ('apify_hunt','ig_scout') AND created_at > now() - interval '14 days' AND status = 'new'");
+  else if (status === "recent") c.push("source = 'apify_hunt' AND created_at > now() - interval '14 days' AND status = 'new'");
   else if (status === "new_business") c.push(igNoSiteSql(0), "hot_why LIKE '%NEW BUSINESS%'");
   // Follow-up due: messaged, never replied, and enough time has passed for
   // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
@@ -226,7 +226,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))::int AS no_site,
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} AND hot_score >= 60)::int AS hot,
       COUNT(*) FILTER (WHERE ${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
-      COUNT(*) FILTER (WHERE source IN ('apify_hunt','ig_scout') AND created_at > now() - interval '14 days' AND status = 'new')::int AS recent,
+      COUNT(*) FILTER (WHERE source = 'apify_hunt' AND created_at > now() - interval '14 days' AND status = 'new')::int AS recent,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE status = 'sent' AND touches < 3
         AND last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)

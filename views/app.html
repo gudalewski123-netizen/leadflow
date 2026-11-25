@@ -58,7 +58,8 @@
   .bar .fill { height:100%; background:var(--brand); border-radius:6px }
   .bar.on { font-weight:650 } .bar:not(.on).dim { opacity:.45 }
 
-  .chips { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:6px; scrollbar-width:none }
+  /* wrap, never scroll sideways: with 7 tabs the last ones (Sent, Replied) went off-screen (2026-11-24) */
+  .chips { display:flex; flex-wrap:wrap; gap:8px; padding-bottom:6px; margin-bottom:6px }
   .chips::-webkit-scrollbar { display:none }
   .chips button { flex:none; background:var(--chip); color:var(--ink); font-weight:500; padding:8px 14px; border-radius:999px; font-size:14px }
   .chips button.on { background:var(--ink); color:var(--card) }
@@ -273,7 +274,7 @@ function applyLang() {
   $("#nicheSel").setAttribute("aria-label", T().trade); $("#stateSel").setAttribute("aria-label", T().state);
 }
 window.setLang = (l) => { LANG = l; try { localStorage.setItem("lf_lang", l); } catch {} applyLang(); render(); window.__dmRefresh?.(); };
-let pageLeads = [], active = "no_site", stateFilter = "all", nicheFilter = "all";
+let pageLeads = [], active = "recent", stateFilter = "all", nicheFilter = "all";
 let stats = {}, facets = { regionCounts: {}, nicheCounts: {} };
 let total = 0, offset = 0, loading = false;
 const PAGE = 40;
@@ -419,16 +420,24 @@ function msgFor(l) {
 function leadQuery(off) {
   return `/api/leads?status=${active}&region=${encodeURIComponent(stateFilter)}&niche=${encodeURIComponent(nicheFilter)}&offset=${off}&limit=${PAGE}`;
 }
+/* Each load gets a number and only the newest one may draw. Without this, clicking Replied while the slow
+   No-website query was still running showed Replied, then the late No-website answer (0 leads) landed on
+   top of it and the page looked stuck (Gregg 2026-11-24). */
+let loadSeq = 0;
 async function loadPage() {
+  const my = ++loadSeq;
   loading = true; pageLeads = []; total = 0; render();
   const [r, f] = await Promise.all([api(leadQuery(0)), api(`/api/facets?status=${active}`)]);
+  if (my !== loadSeq) return;
   facets = f; pageLeads = r.leads; total = r.total; offset = r.leads.length; cursor = -1;
   loading = false; render();
 }
 window.showMore = async () => {
   if (loading || pageLeads.length >= total) return;
   loading = true; render();
+  const my = loadSeq;
   const r = await api(leadQuery(offset));
+  if (my !== loadSeq) return;
   pageLeads = pageLeads.concat(r.leads); total = r.total; offset += r.leads.length;
   loading = false; render();
 };

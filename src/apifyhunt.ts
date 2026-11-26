@@ -18,6 +18,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { classifyLink } from "./sitecheck.js";
 import { pool, init } from "./db.js";
 import { STATE_CITIES, ALL_STATES } from "./cities.js";
 import { scoreOf, isFranchise, type Profile } from "./score.js";
@@ -271,14 +272,15 @@ async function runJob(j: { niche: string; city: string; state: string }) {
       const r = await pool.query(
       `INSERT INTO leads (name, niche, area, state, ig_handle, status, source,
                           last_active, ig_followers, ig_posts, ig_link, ig_email,
-                          ig_phone, ig_business, hot_score, hot_why, ig_checked_at)
+                          ig_phone, ig_business, hot_score, hot_why, ig_checked_at, website)
        VALUES ($1,$2,$3,$4,$5,'new','apify_hunt',
                CASE WHEN $6 > 0 THEN to_timestamp($6) ELSE NULL END,
-               $7,$8,$9,$10,$11,$12,$13,$14, now())
+               $7,$8,$9,$10,$11,$12,$13,$14, now(), $15)
        ON CONFLICT DO NOTHING RETURNING id`,
         [full.slice(0, 120), j.niche, `${j.city} ${j.state}`, j.state, h,
          p.lastPost ?? 0, p.followers, p.posts, p.externalUrl, p.email, p.phone,
-         p.isBusiness, score, why.join(", ")]
+         p.isBusiness, score, why.join(", "),
+         classifyLink(p.externalUrl) === "website" ? p.externalUrl : null]   // 11-26: website recorded at insert (no count gap)
       );
       if (!r.rowCount) continue;
       added++; newHere++;

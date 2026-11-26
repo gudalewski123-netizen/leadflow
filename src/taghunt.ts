@@ -21,7 +21,7 @@ import { scoreOf, isFranchise, isLikelyNewBusiness, type Profile } from "./score
 import { isRelevant, MAX_FOLLOWERS } from "./relevance.js";
 import { junkReason } from "./quality.js";
 import { findChains, brandKey } from "./chains.js";
-import { syncWebsitesFromBio } from "./sitecheck.js";
+import { syncWebsitesFromBio, classifyLink } from "./sitecheck.js";
 
 const TOKEN = fs.readFileSync(`${process.env.HOME}/.tier1-config/.env`, "utf8").match(/^APIFY_TOKEN=["']?([^"'\n]+)/m)![1];
 const TAG_ACTOR = "scrapesmith~instagram-hashtag-scraper";
@@ -128,7 +128,8 @@ for (let b = 0; b < tags.length; b += BATCH) {
   for (const p of posts) {
     const h = String(p.ownerUsername ?? "").toLowerCase();
     if (!h || known.has(h) || cand.has(h)) continue;
-    const tagName = String(p.inputUrl ?? "").match(/tags\/([^/?#]+)/)?.[1]?.toLowerCase() ?? (p.hashtags ?? []).map((x: string) => x.toLowerCase()).find((x: string) => byTag.has(x));
+    const iu = String(p.inputUrl ?? "").toLowerCase();
+    const tagName = iu.match(/tags\/([^/?#]+)/)?.[1] ?? (byTag.has(iu) ? iu : undefined) ?? (p.hashtags ?? []).map((x: string) => x.toLowerCase()).find((x: string) => byTag.has(x));
     const t = byTag.get(tagName ?? "") ?? batch[0];
     const name = String(p.ownerFullName ?? h);
     if (SKIP.test(name) || SKIP.test(h) || isFranchise(name, h) || CHAINS.has(brandKey(name))) { known.add(h); continue; }
@@ -164,10 +165,12 @@ for (let b = 0; b < tags.length; b += BATCH) {
     if (joinedNew) { score = Math.min(100, score + 25); if (!why.some((w) => w.includes("NEW BUSINESS"))) why.push("NEW BUSINESS (Instagram: joined recently)"); }
     why.push(`found via #${c.t.tag}`);
     const r = await pool.query(
-      `INSERT INTO leads (name, niche, area, state, ig_handle, status, source, last_active, ig_followers, ig_posts, ig_link, ig_business, hot_score, hot_why, ig_checked_at)
-       VALUES ($1,$2,$3,$4,$5,'new','ig_hashtag', CASE WHEN $6 > 0 THEN to_timestamp($6) ELSE NULL END, $7,$8,$9,$10,$11,$12, now())
+      `INSERT INTO leads (name, niche, area, state, ig_handle, status, source, last_active, ig_followers, ig_posts, ig_link, ig_business, hot_score, hot_why, ig_checked_at, website)
+       VALUES ($1,$2,$3,$4,$5,'new','ig_hashtag', CASE WHEN $6 > 0 THEN to_timestamp($6) ELSE NULL END, $7,$8,$9,$10,$11,$12, now(), $13)
        ON CONFLICT DO NOTHING RETURNING id`,
-      [name.slice(0, 120), c.t.niche, `${c.t.city} ${c.t.state}`, c.t.state, h, prof.lastPost ?? 0, prof.followers, prof.posts, link, prof.isBusiness, score, why.join(", ")]);
+      [name.slice(0, 120), c.t.niche, `${c.t.city} ${c.t.state}`, c.t.state, h, prof.lastPost ?? 0, prof.followers, prof.posts, link, prof.isBusiness, score, why.join(", "),
+       /* 11-26 Gregg "there is a gap": record the website AT INSERT, so a lead with a site never shows in No website/Hot for the minutes until the end-of-run sync */
+       classifyLink(link) === "website" ? link : null]);
     if (!r.rowCount) continue;
     added++;
     const fresh = prof.lastPost && Date.now() / 1000 - prof.lastPost < 60 * 86400;

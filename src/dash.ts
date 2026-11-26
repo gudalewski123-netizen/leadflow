@@ -7,7 +7,11 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, init } from "./db.js";
-import { syncWebsitesFromBio, IG_NO_SITE_SQL, igNoSiteSql, SENDABLE_SQL } from "./sitecheck.js";
+import { syncWebsitesFromBio, IG_NO_SITE_SQL, igNoSiteSql, SENDABLE_SQL, LINKPAGE_UNCHECKED_SQL, NOT_EXCLUDED_NICHE_SQL } from "./sitecheck.js";
+/* Just pulled (11-26, Gregg: "a lot of these have websites already" — 1,099 of 1,347 did): Apify-hunt leads from the last
+   14 days, not messaged, with NO website (none on file, no unchecked link page) and not an excluded trade. */
+const RECENT_SQL = `(source = 'apify_hunt' AND created_at > now() - interval '14 days' AND status = 'new'
+  AND COALESCE(website, '') = '' AND NOT ${LINKPAGE_UNCHECKED_SQL} AND ${NOT_EXCLUDED_NICHE_SQL})`;
 import { checkLinkPages, ensureLinkpageColumn } from "./linkpage.js";
 import { cardOpener, cardVariantTag } from "./variants.js";
 import { budget as dmBudget } from "./dmcap.js";
@@ -134,7 +138,7 @@ function tabConds(status: string): string[] {
   /* Just pulled (Gregg 2026-11-24: "where are the leads we recently pulled"): leads the Apify hunt added (the free in-tab scout's
      older names are left out, Gregg: "the 1300 we just pulled from Apify") in the last 14 days that have NOT been messaged yet (status 'new'), best first. Messaged ones live
      in Sent / Follow up only — showing them here read as "you re-added people we already DM'd" (Gregg, same day). */
-  else if (status === "recent") c.push("source = 'apify_hunt' AND created_at > now() - interval '14 days' AND status = 'new'");
+  else if (status === "recent") c.push(RECENT_SQL);
   else if (status === "new_business") c.push(igNoSiteSql(0), "hot_why LIKE '%NEW BUSINESS%'");
   // Follow-up due: messaged, never replied, and enough time has passed for
   // touch 2 (day 4) or touch 3 (day 9). Capped at 3 touches — past that you're
@@ -226,7 +230,7 @@ app.get("/api/stats", async (_req, res) => {
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} OR (${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%'))::int AS no_site,
       COUNT(*) FILTER (WHERE ${IG_NO_SITE_SQL} AND hot_score >= 60)::int AS hot,
       COUNT(*) FILTER (WHERE ${igNoSiteSql(0)} AND hot_why LIKE '%NEW BUSINESS%')::int AS new_business,
-      COUNT(*) FILTER (WHERE source = 'apify_hunt' AND created_at > now() - interval '14 days' AND status = 'new')::int AS recent,
+      COUNT(*) FILTER (WHERE ${RECENT_SQL})::int AS recent,
       COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
       COUNT(*) FILTER (WHERE status = 'sent' AND touches < 3
         AND last_touch_at < now() - (CASE WHEN touches <= 1 THEN interval '4 days' ELSE interval '5 days' END)
